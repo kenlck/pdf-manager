@@ -12,11 +12,11 @@ export function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-function pickViaInput(multiple: boolean): Promise<File[] | null> {
+function pickViaInput(multiple: boolean, accept: string): Promise<File[] | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "application/pdf,.pdf";
+    input.accept = accept;
     input.multiple = multiple;
     input.style.display = "none";
     document.body.appendChild(input);
@@ -61,7 +61,7 @@ export async function pickOpenPdfs(
   multiple: boolean,
 ): Promise<PickedPdf[] | null> {
   if (!isTauriRuntime()) {
-    const files = await pickViaInput(multiple);
+    const files = await pickViaInput(multiple, "application/pdf,.pdf");
     if (!files) {
       return null;
     }
@@ -82,6 +82,46 @@ export async function pickOpenPdfs(
     picked.push({ path, bytes: await readFile(path) });
   }
   return picked;
+}
+
+export type PickedImage = { path: string; bytes: Uint8Array; mime: string };
+
+const IMAGE_FILTER = [{ name: "Images", extensions: ["png", "jpg", "jpeg"] }];
+
+function mimeFromPath(path: string): string {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".png")) {
+    return "image/png";
+  }
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  return "application/octet-stream";
+}
+
+export async function pickImage(): Promise<PickedImage | null> {
+  if (!isTauriRuntime()) {
+    const files = await pickViaInput(false, "image/png,image/jpeg");
+    if (!files || files.length === 0) {
+      return null;
+    }
+    const file = files[0];
+    return {
+      path: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      mime: file.type || mimeFromPath(file.name),
+    };
+  }
+
+  const result = await open({
+    multiple: false,
+    filters: IMAGE_FILTER,
+    title: "Choose a signature image",
+  });
+  if (result === null || Array.isArray(result)) {
+    return null;
+  }
+  return { path: result, bytes: await readFile(result), mime: mimeFromPath(result) };
 }
 
 export async function pickSavePdf(defaultPath?: string): Promise<string | null> {
