@@ -183,11 +183,22 @@ button:focus-visible {
   padding: 0.45rem;
   background: var(--surface);
   text-align: left;
+  cursor: grab;
 }
 
 .page-thumb.selected {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.page-thumb[data-reorder-state="drag-source"] {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.page-thumb[data-reorder-state="drop-target"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .page-thumb canvas {

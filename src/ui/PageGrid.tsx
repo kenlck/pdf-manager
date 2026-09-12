@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import type { PageRef, Source, SourceId } from "../domain/types";
 import { PageThumb } from "./PageThumb";
+import { usePageReorder } from "./usePageReorder";
 
 const ROW_ESTIMATE = 180;
 const BUFFER = 4;
@@ -20,7 +21,10 @@ type PageGridProps = {
 export function PageGrid(props: PageGridProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState({ start: 0, end: 24 });
-  const dragFrom = useRef<number | null>(null);
+  const bind = usePageReorder({
+    pageCount: props.pages.length,
+    onMove: props.onMove,
+  });
 
   const columns = 4;
   const rowCount = Math.ceil(props.pages.length / columns);
@@ -82,24 +86,10 @@ export function PageGrid(props: PageGridProps) {
               label={`${index + 1}`}
               selected={props.selected.has(index) || props.focused === index}
               scale={0.25}
-              draggable
+              reorder={bind(index)}
               onClick={(event) => {
                 props.onSelect(index, event);
                 props.onFocus(index);
-              }}
-              onDragStart={() => {
-                dragFrom.current = index;
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (dragFrom.current === null) {
-                  return;
-                }
-                props.onMove(dragFrom.current, index);
-                dragFrom.current = null;
               }}
             />
           ))}

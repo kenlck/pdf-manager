@@ -1,6 +1,7 @@
-import type { DragEvent, MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import type { PageRef, Source } from "../domain/types";
 import { usePageCanvas } from "./usePageCanvas";
+import type { PageReorderItemBinding } from "./usePageReorder";
 
 type PageThumbProps = {
   page: PageRef;
@@ -10,10 +11,7 @@ type PageThumbProps = {
   selected: boolean;
   scale?: number;
   onClick: (event: MouseEvent) => void;
-  draggable?: boolean;
-  onDragStart?: (event: DragEvent) => void;
-  onDragOver?: (event: DragEvent) => void;
-  onDrop?: (event: DragEvent) => void;
+  reorder: PageReorderItemBinding;
 };
 
 export function PageThumb(props: PageThumbProps) {
@@ -22,16 +20,19 @@ export function PageThumb(props: PageThumbProps) {
   const sourceName = props.source
     ? props.source.path.split(/[/\\]/).pop() ?? props.source.path
     : "unknown";
+  const { state } = props.reorder;
 
   return (
     <button
       type="button"
       className={`page-thumb ${props.selected ? "selected" : ""}`}
+      draggable={props.reorder.draggable}
+      onDragStart={props.reorder.onDragStart}
+      onDragOver={props.reorder.onDragOver}
+      onDrop={props.reorder.onDrop}
+      onDragEnd={props.reorder.onDragEnd}
+      data-reorder-state={state === "idle" ? undefined : state}
       onClick={props.onClick}
-      draggable={props.draggable}
-      onDragStart={props.onDragStart}
-      onDragOver={props.onDragOver}
-      onDrop={props.onDrop}
       aria-label={props.label}
       data-source={sourceName}
     >

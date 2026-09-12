@@ -346,6 +346,7 @@ export default function App() {
               selected={session.selected}
               onFocus={(index) => dispatch({ type: "focus", index })}
               onSelect={onSelect}
+              onMove={(from, to) => dispatch({ type: "move", from, to })}
             />
             <PagePreview
               page={focusedPage}

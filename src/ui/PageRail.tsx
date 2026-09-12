@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 import type { PageRef, Source, SourceId } from "../domain/types";
 import { PageThumb } from "./PageThumb";
+import { usePageReorder } from "./usePageReorder";
 
 type PageRailProps = {
   pages: PageRef[];
@@ -10,9 +11,15 @@ type PageRailProps = {
   selected: ReadonlySet<number>;
   onFocus: (index: number) => void;
   onSelect: (index: number, event: MouseEvent) => void;
+  onMove: (from: number, to: number) => void;
 };
 
 export function PageRail(props: PageRailProps) {
+  const bind = usePageReorder({
+    pageCount: props.pages.length,
+    onMove: props.onMove,
+  });
+
   return (
     <aside className="page-rail" aria-label="Page thumbnails">
       {props.pages.map((page, index) => (
@@ -24,6 +31,7 @@ export function PageRail(props: PageRailProps) {
           label={`${index + 1}`}
           selected={props.selected.has(index) || props.focused === index}
           scale={0.15}
+          reorder={bind(index)}
           onClick={(event) => {
             props.onSelect(index, event);
             props.onFocus(index);

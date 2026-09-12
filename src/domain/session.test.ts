@@ -93,6 +93,56 @@ describe("session reducer", () => {
     expect(session.pages.map((p) => p.pageIndex)).toEqual([0, 1, 2]);
   });
 
+  it("leaves past and future unchanged when move from equals to", () => {
+    const a = source("a", "/tmp/a.pdf", 3);
+    let session = apply(createSession(), {
+      type: "open",
+      sources: [a],
+      pages: pagesFromSource(a),
+    });
+    const before = session;
+    session = apply(session, { type: "move", from: 1, to: 1 });
+    expect(session).toBe(before);
+    expect(session.past).toBe(before.past);
+    expect(session.future).toBe(before.future);
+  });
+
+  it("leaves history unchanged when move is out of range", () => {
+    const a = source("a", "/tmp/a.pdf", 3);
+    let session = apply(createSession(), {
+      type: "open",
+      sources: [a],
+      pages: pagesFromSource(a),
+    });
+    const before = session;
+    session = apply(session, { type: "move", from: 0, to: 9 });
+    expect(session).toBe(before);
+    expect(session.past).toBe(before.past);
+    expect(session.future).toBe(before.future);
+  });
+
+  it("records exactly one undo step for a real move and remaps selection", () => {
+    const a = source("a", "/tmp/a.pdf", 4);
+    let session = apply(createSession(), {
+      type: "open",
+      sources: [a],
+      pages: pagesFromSource(a),
+    });
+    session = apply(session, {
+      type: "select",
+      indices: [1, 3],
+      mode: "replace",
+    });
+    session = apply(session, { type: "delete", indices: [0] });
+    expect([...session.selected].sort()).toEqual([0, 2]);
+    const historyBefore = session.past.length;
+    session = apply(session, { type: "move", from: 2, to: 0 });
+    expect(session.past).toHaveLength(historyBefore + 1);
+    expect(session.future).toEqual([]);
+    expect([...session.selected].sort()).toEqual([0, 1]);
+    expect(session.pages.map((p) => p.pageIndex)).toEqual([3, 1, 2]);
+  });
+
   it("remaps selection after delete and move", () => {
     const a = source("a", "/tmp/a.pdf", 4);
     let session = apply(createSession(), {
