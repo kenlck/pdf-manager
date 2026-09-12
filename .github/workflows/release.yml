@@ -1,0 +1,52 @@
+name: Windows release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install stable Rust
+        run: rustup default stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Windows installer
+        run: npm run tauri build -- --bundles nsis -- --locked
+
+      - name: Upload installer to release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $installers = @(Get-ChildItem -Path src-tauri/target/release/bundle/nsis/*-setup.exe)
+          if ($installers.Count -eq 0) {
+            throw "No Windows installer was generated."
+          }
+          foreach ($installer in $installers) {
+            gh release upload "$env:RELEASE_TAG" "$($installer.FullName)" --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to upload $($installer.Name)."
+            }
+          }
