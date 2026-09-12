@@ -1,0 +1,12 @@
+{
+  "name": "PDF Manager",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "vite-dev",
+      "command": "npm run dev",
+      "description": "Vite dev server for the PDF Manager frontend on http://localhost:1420"
+    }
+  ]
+}
