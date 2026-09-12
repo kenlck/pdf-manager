@@ -300,6 +300,11 @@ export function apply(session: Session, command: Command): Session {
     };
   }
 
+  const next = applyMutating(session, command);
+  if (next === session) {
+    return session;
+  }
+
   const historyCommands = new Set([
     "open",
     "insert",
@@ -308,10 +313,12 @@ export function apply(session: Session, command: Command): Session {
     "rotate",
     "delete",
   ]);
-  const base = historyCommands.has(command.type)
-    ? pushHistory(session)
-    : session;
-  return applyMutating(base, command);
+  if (!historyCommands.has(command.type)) {
+    return next;
+  }
+
+  const recorded = pushHistory(session);
+  return { ...next, past: recorded.past, future: recorded.future };
 }
 
 export function pagesFromSource(source: Source): PageRef[] {
