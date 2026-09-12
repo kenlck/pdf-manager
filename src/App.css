@@ -141,11 +141,189 @@ button:focus-visible {
   padding: 1rem;
 }
 
-.page-preview-stage canvas {
+.page-stack {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.page-stack canvas {
+  display: block;
   max-width: 100%;
   height: auto;
   background: white;
   box-shadow: 0 12px 40px oklch(0 0 0 / 0.35);
+}
+
+.page-thumb .page-stack {
+  width: 100%;
+}
+
+.page-thumb .page-stack canvas {
+  width: 100%;
+  box-shadow: none;
+  border-radius: 2px;
+}
+
+.stamp-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.stamp-layer.read-only {
+  pointer-events: none;
+}
+
+.stamp {
+  position: absolute;
+  box-sizing: border-box;
+  touch-action: none;
+}
+
+.stamp img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.stamp.selected {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+  z-index: 2;
+}
+
+.stamp-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  background: var(--accent);
+  border: 1px solid var(--accent-ink);
+  border-radius: 1px;
+}
+
+.stamp-handle.nw {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+
+.stamp-handle.ne {
+  right: 0;
+  top: 0;
+  transform: translate(50%, -50%);
+  cursor: nesw-resize;
+}
+
+.stamp-handle.sw {
+  left: 0;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  cursor: nesw-resize;
+}
+
+.stamp-handle.se {
+  right: 0;
+  bottom: 0;
+  transform: translate(50%, 50%);
+  cursor: nwse-resize;
+}
+
+.signature-menu {
+  position: relative;
+}
+
+.signature-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 240px;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 12px 32px oklch(0 0 0 / 0.35);
+}
+
+.signature-menu-empty {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.signature-menu-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.signature-menu-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.signature-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-align: left;
+  min-width: 0;
+}
+
+.signature-menu-item img {
+  width: 48px;
+  height: 24px;
+  object-fit: contain;
+  background: white;
+  border-radius: 2px;
+}
+
+.signature-menu-delete {
+  color: var(--danger);
+}
+
+.signature-menu-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.signature-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.signature-pad-canvas {
+  width: 100%;
+  height: auto;
+  background:
+    repeating-conic-gradient(
+      oklch(0.38 0.02 250) 0% 25%,
+      oklch(0.3 0.02 250) 0% 50%
+    )
+    50% / 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.signature-pad-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
 }
 
 .page-preview-status {
@@ -199,13 +377,6 @@ button:focus-visible {
 .page-thumb[data-reorder-state="drop-target"] {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-.page-thumb canvas {
-  width: 100%;
-  height: auto;
-  background: white;
-  border-radius: 2px;
 }
 
 .page-thumb-meta {

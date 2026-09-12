@@ -1,4 +1,5 @@
-import type { PageRef } from "../domain/types";
+import type { DisplayNormRect, PageRef, StampBytes, StampId } from "../domain/types";
+import { StampLayer } from "./StampLayer";
 import { usePageCanvas } from "./usePageCanvas";
 
 type PagePreviewProps = {
@@ -6,6 +7,11 @@ type PagePreviewProps = {
   bytes: Uint8Array | undefined;
   pageNumber: number | null;
   total: number;
+  stampBytes: StampBytes;
+  selectedStampId: StampId | null;
+  onSelectStamp: (stampId: StampId) => void;
+  onCommitStamp: (stampId: StampId, rect: DisplayNormRect) => void;
+  onSelectPage: () => void;
 };
 
 export function PagePreview(props: PagePreviewProps) {
@@ -22,7 +28,18 @@ export function PagePreview(props: PagePreviewProps) {
   return (
     <section className="page-preview">
       <div className="page-preview-stage">
-        <canvas ref={canvasRef} />
+        <div className="page-stack">
+          <canvas ref={canvasRef} />
+          <StampLayer
+            stamps={props.page.stamps}
+            stampBytes={props.stampBytes}
+            selectedStampId={props.selectedStampId}
+            interactive
+            onSelect={props.onSelectStamp}
+            onCommit={props.onCommitStamp}
+            onSelectPage={props.onSelectPage}
+          />
+        </div>
       </div>
       <p className="page-preview-status">
         Page {props.pageNumber} of {props.total}

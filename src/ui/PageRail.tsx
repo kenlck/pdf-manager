@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import type { PageRef, Source, SourceId } from "../domain/types";
+import type { PageRef, Source, SourceId, StampBytes } from "../domain/types";
 import { PageThumb } from "./PageThumb";
 import { usePageReorder } from "./usePageReorder";
 
@@ -7,6 +7,7 @@ type PageRailProps = {
   pages: PageRef[];
   sources: Map<SourceId, Source>;
   sourceBytes: Map<SourceId, Uint8Array>;
+  stampBytes: StampBytes;
   focused: number | null;
   selected: ReadonlySet<number>;
   onFocus: (index: number) => void;
@@ -28,6 +29,7 @@ export function PageRail(props: PageRailProps) {
           page={page}
           source={props.sources.get(page.sourceId)}
           bytes={props.sourceBytes.get(page.sourceId)}
+          stampBytes={props.stampBytes}
           label={`${index + 1}`}
           selected={props.selected.has(index) || props.focused === index}
           scale={0.15}

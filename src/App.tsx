@@ -3,21 +3,38 @@ import type { MouseEvent } from "react";
 import type { Command } from "./domain/commands";
 import { buildExportPlan } from "./domain/exportPlan";
 import { apply, createSession, pagesFromSource } from "./domain/session";
-import type { PageRef, Source, SourceId } from "./domain/types";
+import { aspectFromPixelSize, defaultStampRect } from "./domain/stampGeometry";
+import type { PageRef, SignatureId, Source, SourceId, StampBytes } from "./domain/types";
+import {
+  mintStampId,
+  selectedPageIndices,
+  selectedStamp,
+} from "./domain/types";
 import { openPdf } from "./pdf/openPdf";
 import { clearRenderCache } from "./pdf/render";
 import { writePdfFromPlan } from "./pdf/write";
 import {
   isTauriRuntime,
   loadPdfsFromUrls,
+  pickImage,
   pickOpenPdfs,
   pickSavePdf,
   type PickedPdf,
   writePdfBytes,
 } from "./shell/files";
+import {
+  addDrawn,
+  addImported,
+  infoOf,
+  loadVault,
+  pngOf,
+  removeSignature,
+  type VaultError,
+} from "./signatures/vault";
 import { PageGrid } from "./ui/PageGrid";
 import { PagePreview } from "./ui/PagePreview";
 import { PageRail } from "./ui/PageRail";
+import { SignatureMenu } from "./ui/SignatureMenu";
 import { Toolbar } from "./ui/Toolbar";
 import "./App.css";
 
@@ -32,6 +49,19 @@ function sessionReducer(
 
 function basename(path: string): string {
   return path.split(/[/\\]/).pop() ?? path;
+}
+
+function vaultMessage(error: VaultError): string {
+  switch (error.kind) {
+    case "tooLarge":
+      return "Signature is too large.";
+    case "undecodable":
+      return "Could not read that image.";
+    case "unsupportedType":
+      return "Use a PNG or JPEG.";
+    case "quota":
+      return "Signature library is full.";
+  }
 }
 
 async function loadSources(picked: PickedPdf[]): Promise<{
@@ -70,6 +100,8 @@ export default function App() {
     createSession,
   );
   const [sourceBytes, setSourceBytes] = useState<SourceBytes>(() => new Map());
+  const [stampBytes, setStampBytes] = useState<StampBytes>(() => new Map());
+  const [vault, setVault] = useState(loadVault);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Open a PDF to begin.");
@@ -102,6 +134,7 @@ export default function App() {
       }
       if (mode === "open") {
         clearRenderCache();
+        setStampBytes(new Map());
         setSourceBytes(loaded.bytes);
         dispatch({
           type: "open",
@@ -116,8 +149,8 @@ export default function App() {
       mergeBytes(loaded.bytes);
       if (mode === "insert") {
         const afterIndex =
-          session.selected.size > 0
-            ? Math.max(...session.selected)
+          selectedPageIndices(session.selection).size > 0
+            ? Math.max(...selectedPageIndices(session.selection))
             : session.focused;
         dispatch({
           type: "insert",
@@ -135,7 +168,7 @@ export default function App() {
       });
       setStatus(`Combined ${loaded.sources.length} file(s).`);
     },
-    [mergeBytes, session.focused, session.selected],
+    [mergeBytes, session.focused, session.selection],
   );
 
   const runOpen = useCallback(
@@ -187,6 +220,7 @@ export default function App() {
           return;
         }
         clearRenderCache();
+        setStampBytes(new Map());
         setSourceBytes(loaded.bytes);
         dispatch({
           type: "open",
@@ -227,7 +261,7 @@ export default function App() {
         setStatus("Save cancelled.");
         return;
       }
-      const bytes = await writePdfFromPlan(plan.pages, sourceBytes);
+      const bytes = await writePdfFromPlan(plan.pages, sourceBytes, stampBytes);
       await writePdfBytes(path, bytes);
       setStatus(
         `Saved ${basename(path)}. Rearranging pages invalidates digital signatures.`,
@@ -237,7 +271,36 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [session, sourceBytes]);
+  }, [session, sourceBytes, stampBytes]);
+
+  const placeFromLibrary = useCallback(
+    (signatureId: SignatureId) => {
+      const pageIndex = session.focused;
+      if (pageIndex === null) {
+        setStatus("Select a page first.");
+        return;
+      }
+      const png = pngOf(vault, signatureId);
+      if (!png) {
+        return;
+      }
+      const info = infoOf(vault, signatureId);
+      const stampId = mintStampId();
+      setStampBytes((prev) => new Map(prev).set(stampId, png.slice()));
+      dispatch({
+        type: "placeStamp",
+        pageIndex,
+        stamp: {
+          id: stampId,
+          rect: defaultStampRect(
+            aspectFromPixelSize(info.pixelSize),
+          ),
+        },
+      });
+      setStatus("Signature placed.");
+    },
+    [session.focused, vault],
+  );
 
   const onSelect = useCallback(
     (index: number, event: MouseEvent) => {
@@ -262,15 +325,31 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (
+        (event.key === "Delete" || event.key === "Backspace") &&
+        event.target instanceof HTMLElement &&
+        event.target.closest(".signature-pad")
+      ) {
+        return;
+      }
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (session.selected.size === 0) {
+        const stamp = selectedStamp(session.selection);
+        if (stamp) {
+          event.preventDefault();
+          dispatch({
+            type: "removeStamp",
+            pageIndex: stamp.pageIndex,
+            stampId: stamp.stampId,
+          });
+          setStatus("Signature removed.");
+          return;
+        }
+        const indices = [...selectedPageIndices(session.selection)];
+        if (indices.length === 0) {
           return;
         }
         event.preventDefault();
-        dispatch({
-          type: "delete",
-          indices: [...session.selected],
-        });
+        dispatch({ type: "delete", indices });
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
@@ -279,13 +358,36 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session.selected]);
+  }, [session.selection]);
 
   const focusedPage =
     session.focused !== null ? (session.pages[session.focused] ?? null) : null;
   const focusedBytes = focusedPage
     ? sourceBytes.get(focusedPage.sourceId)
     : undefined;
+  const pageIndices = selectedPageIndices(session.selection);
+  const stampSel = selectedStamp(session.selection);
+
+  function onDelete() {
+    if (stampSel) {
+      dispatch({
+        type: "removeStamp",
+        pageIndex: stampSel.pageIndex,
+        stampId: stampSel.stampId,
+      });
+      setStatus("Signature removed.");
+      return;
+    }
+    dispatch({
+      type: "delete",
+      indices:
+        pageIndices.size > 0
+          ? [...pageIndices]
+          : session.focused !== null
+            ? [session.focused]
+            : [],
+    });
+  }
 
   return (
     <div className="app">
@@ -294,8 +396,44 @@ export default function App() {
         canUndo={session.past.length > 0}
         canRedo={session.future.length > 0}
         canSave={session.pages.length > 0}
-        hasSelection={session.selected.size > 0}
+        hasSelection={stampSel !== null || pageIndices.size > 0}
         busy={busy}
+        signatureMenu={
+          <SignatureMenu
+            vault={vault}
+            busy={busy}
+            onPlace={placeFromLibrary}
+            onDrawn={(png, pixelSize) => {
+              const result = addDrawn(png, pixelSize);
+              if (!result.ok) {
+                setError(vaultMessage(result.error));
+                return;
+              }
+              setVault(loadVault());
+              setStatus("Signature saved.");
+            }}
+            onImport={() => {
+              void (async () => {
+                const picked = await pickImage();
+                if (!picked) {
+                  setStatus("Cancelled.");
+                  return;
+                }
+                const result = await addImported(picked.bytes, picked.mime);
+                if (!result.ok) {
+                  setError(vaultMessage(result.error));
+                  return;
+                }
+                setVault(loadVault());
+                setStatus("Signature imported.");
+              })();
+            }}
+            onRemove={(id) => {
+              setVault(removeSignature(id));
+              setStatus("Signature deleted.");
+            }}
+          />
+        }
         onOpen={() => void runOpen("open")}
         onInsert={() => void runOpen("insert")}
         onCombine={() => void runOpen("combine")}
@@ -306,25 +444,15 @@ export default function App() {
           dispatch({
             type: "rotate",
             indices:
-              session.selected.size > 0
-                ? [...session.selected]
+              pageIndices.size > 0
+                ? [...pageIndices]
                 : session.focused !== null
                   ? [session.focused]
                   : [],
             delta,
           })
         }
-        onDelete={() =>
-          dispatch({
-            type: "delete",
-            indices:
-              session.selected.size > 0
-                ? [...session.selected]
-                : session.focused !== null
-                  ? [session.focused]
-                  : [],
-          })
-        }
+        onDelete={onDelete}
         onWorkspace={(workspace) =>
           dispatch({ type: "setWorkspace", workspace })
         }
@@ -342,8 +470,9 @@ export default function App() {
               pages={session.pages}
               sources={session.sources}
               sourceBytes={sourceBytes}
+              stampBytes={stampBytes}
               focused={session.focused}
-              selected={session.selected}
+              selected={pageIndices}
               onFocus={(index) => dispatch({ type: "focus", index })}
               onSelect={onSelect}
               onMove={(from, to) => dispatch({ type: "move", from, to })}
@@ -353,6 +482,39 @@ export default function App() {
               bytes={focusedBytes}
               pageNumber={session.focused !== null ? session.focused + 1 : null}
               total={session.pages.length}
+              stampBytes={stampBytes}
+              selectedStampId={stampSel?.stampId ?? null}
+              onSelectStamp={(stampId) => {
+                if (session.focused === null) {
+                  return;
+                }
+                dispatch({
+                  type: "selectStamp",
+                  pageIndex: session.focused,
+                  stampId,
+                });
+              }}
+              onCommitStamp={(stampId, rect) => {
+                if (session.focused === null) {
+                  return;
+                }
+                dispatch({
+                  type: "transformStamp",
+                  pageIndex: session.focused,
+                  stampId,
+                  rect,
+                });
+              }}
+              onSelectPage={() => {
+                if (session.focused === null) {
+                  return;
+                }
+                dispatch({
+                  type: "select",
+                  indices: [session.focused],
+                  mode: "replace",
+                });
+              }}
             />
           </div>
         ) : (
@@ -360,7 +522,8 @@ export default function App() {
             pages={session.pages}
             sources={session.sources}
             sourceBytes={sourceBytes}
-            selected={session.selected}
+            stampBytes={stampBytes}
+            selected={pageIndices}
             focused={session.focused}
             onSelect={onSelect}
             onFocus={(index) => dispatch({ type: "focus", index })}

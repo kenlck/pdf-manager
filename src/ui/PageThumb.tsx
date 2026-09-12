@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
-import type { PageRef, Source } from "../domain/types";
+import type { PageRef, Source, StampBytes } from "../domain/types";
+import { StampLayer } from "./StampLayer";
 import { usePageCanvas } from "./usePageCanvas";
 import type { PageReorderItemBinding } from "./usePageReorder";
 
@@ -7,6 +8,7 @@ type PageThumbProps = {
   page: PageRef;
   source: Source | undefined;
   bytes: Uint8Array | undefined;
+  stampBytes: StampBytes;
   label: string;
   selected: boolean;
   scale?: number;
@@ -36,7 +38,15 @@ export function PageThumb(props: PageThumbProps) {
       aria-label={props.label}
       data-source={sourceName}
     >
-      <canvas ref={canvasRef} />
+      <div className="page-stack">
+        <canvas ref={canvasRef} />
+        <StampLayer
+          stamps={props.page.stamps}
+          stampBytes={props.stampBytes}
+          selectedStampId={null}
+          interactive={false}
+        />
+      </div>
       <span className="page-thumb-meta">
         <span>{props.label}</span>
         <span className="page-thumb-source">{sourceName}</span>
