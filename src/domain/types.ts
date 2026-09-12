@@ -4,6 +4,7 @@ export type SignatureId = string & { readonly __brand: "SignatureId" };
 
 export type Rotation = 0 | 90 | 180 | 270;
 
+/** Unit square, top-left origin, after pdf.js page.rotation. Not PDF user space. */
 export type DisplayNormRect = {
   readonly x: number;
   readonly y: number;
