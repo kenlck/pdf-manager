@@ -1,14 +1,29 @@
 import type { Command } from "./commands";
+import { displayNormRect, rectsEqual, rotateDisplayRect } from "./stampGeometry";
 import type {
   PageRef,
   Rotation,
+  Selection,
   Session,
   SessionSnapshot,
   Source,
   SourceId,
 } from "./types";
+import { selectedPageIndices } from "./types";
 
 const MAX_HISTORY = 100;
+
+const HISTORY = new Set([
+  "open",
+  "insert",
+  "combine",
+  "move",
+  "rotate",
+  "delete",
+  "placeStamp",
+  "transformStamp",
+  "removeStamp",
+]);
 
 function cloneSources(sources: Map<SourceId, Source>): Map<SourceId, Source> {
   return new Map(
@@ -16,22 +31,31 @@ function cloneSources(sources: Map<SourceId, Source>): Map<SourceId, Source> {
   );
 }
 
-function snapshotOf(session: SessionSnapshot): SessionSnapshot {
+function clonePage(page: PageRef): PageRef {
   return {
-    sources: cloneSources(session.sources),
-    pages: session.pages.map((page) => ({ ...page })),
-    selected: new Set(session.selected),
-    focused: session.focused,
-    workspace: session.workspace,
+    ...page,
+    stamps: page.stamps.map((stamp) => ({
+      id: stamp.id,
+      rect: displayNormRect(stamp.rect),
+    })),
   };
 }
 
-function pushHistory(session: Session): Session {
-  const past = [...session.past, snapshotOf(session)];
-  if (past.length > MAX_HISTORY) {
-    past.shift();
+function cloneSelection(selection: Selection): Selection {
+  if (selection.kind === "pages") {
+    return { kind: "pages", indices: new Set(selection.indices) };
   }
-  return { ...session, past, future: [] };
+  return { kind: "stamp", pageIndex: selection.pageIndex, stampId: selection.stampId };
+}
+
+function snapshotOf(session: SessionSnapshot): SessionSnapshot {
+  return {
+    sources: cloneSources(session.sources),
+    pages: session.pages.map(clonePage),
+    selection: cloneSelection(session.selection),
+    focused: session.focused,
+    workspace: session.workspace,
+  };
 }
 
 function remappedSelection(
@@ -46,6 +70,20 @@ function remappedSelection(
     }
   }
   return next;
+}
+
+function mapSelection(
+  selection: Selection,
+  mapIndex: (index: number) => number | null,
+): Selection {
+  if (selection.kind === "stamp") {
+    const mapped = mapIndex(selection.pageIndex);
+    if (mapped === null) {
+      return { kind: "pages", indices: new Set() };
+    }
+    return { kind: "stamp", pageIndex: mapped, stampId: selection.stampId };
+  }
+  return { kind: "pages", indices: remappedSelection(selection.indices, mapIndex) };
 }
 
 function clampFocus(
@@ -91,8 +129,8 @@ function applyMutating(session: Session, command: Command): Session {
       return {
         ...session,
         sources: mergeSources(new Map(), command.sources),
-        pages: command.pages.map((page) => ({ ...page })),
-        selected: new Set(),
+        pages: command.pages.map(clonePage),
+        selection: { kind: "pages", indices: new Set() },
         focused: command.pages.length > 0 ? 0 : null,
       };
     }
@@ -103,11 +141,11 @@ function applyMutating(session: Session, command: Command): Session {
           : Math.max(0, Math.min(command.afterIndex + 1, session.pages.length));
       const pages = [
         ...session.pages.slice(0, insertAt),
-        ...command.pages.map((page) => ({ ...page })),
+        ...command.pages.map(clonePage),
         ...session.pages.slice(insertAt),
       ];
       const shift = command.pages.length;
-      const selected = remappedSelection(session.selected, (index) =>
+      const selection = mapSelection(session.selection, (index) =>
         index >= insertAt ? index + shift : index,
       );
       const focused =
@@ -120,14 +158,14 @@ function applyMutating(session: Session, command: Command): Session {
         ...session,
         sources: mergeSources(session.sources, command.sources),
         pages,
-        selected,
+        selection,
         focused: clampFocus(focused, pages.length),
       };
     }
     case "combine": {
       const pages = [
         ...session.pages,
-        ...command.pages.map((page) => ({ ...page })),
+        ...command.pages.map(clonePage),
       ];
       return {
         ...session,
@@ -150,7 +188,7 @@ function applyMutating(session: Session, command: Command): Session {
       const pages = [...session.pages];
       const [moved] = pages.splice(from, 1);
       pages.splice(to, 0, moved);
-      const selected = remappedSelection(session.selected, (index) => {
+      const selection = mapSelection(session.selection, (index) => {
         if (index === from) {
           return to;
         }
@@ -177,19 +215,28 @@ function applyMutating(session: Session, command: Command): Session {
                   session.focused < from
                 ? session.focused + 1
                 : session.focused;
-      return { ...session, pages, selected, focused };
+      return { ...session, pages, selection, focused };
     }
     case "rotate": {
       const indices = new Set(command.indices);
+      let changed = false;
       const pages = session.pages.map((page, index) => {
         if (!indices.has(index)) {
           return page;
         }
+        changed = true;
         return {
-          ...page,
+          ...clonePage(page),
           rotation: normalizeRotation(page.rotation + command.delta),
+          stamps: page.stamps.map((stamp) => ({
+            id: stamp.id,
+            rect: rotateDisplayRect(stamp.rect, command.delta),
+          })),
         };
       });
+      if (!changed) {
+        return session;
+      }
       return { ...session, pages };
     }
     case "delete": {
@@ -206,8 +253,8 @@ function applyMutating(session: Session, command: Command): Session {
         indexMap.set(index, pages.length);
         pages.push(page);
       });
-      const selected = remappedSelection(
-        session.selected,
+      const selection = mapSelection(
+        session.selection,
         (index) => indexMap.get(index) ?? null,
       );
       let focused: number | null = null;
@@ -227,13 +274,13 @@ function applyMutating(session: Session, command: Command): Session {
       return {
         ...session,
         pages,
-        selected,
+        selection,
         focused: clampFocus(focused, pages.length),
       };
     }
     case "select": {
       const next = new Set(
-        command.mode === "replace" ? [] : session.selected,
+        command.mode === "replace" ? [] : selectedPageIndices(session.selection),
       );
       for (const index of command.indices) {
         if (index < 0 || index >= session.pages.length) {
@@ -245,16 +292,133 @@ function applyMutating(session: Session, command: Command): Session {
           next.add(index);
         }
       }
-      return { ...session, selected: next };
+      return { ...session, selection: { kind: "pages", indices: next } };
     }
     case "focus": {
+      const focused = clampFocus(command.index, session.pages.length);
+      if (
+        session.selection.kind === "stamp" &&
+        (focused === null || session.selection.pageIndex !== focused)
+      ) {
+        return {
+          ...session,
+          focused,
+          selection: { kind: "pages", indices: new Set() },
+        };
+      }
       return {
         ...session,
-        focused: clampFocus(command.index, session.pages.length),
+        focused,
       };
     }
     case "setWorkspace": {
+      if (
+        command.workspace === "organize" &&
+        session.selection.kind === "stamp"
+      ) {
+        return {
+          ...session,
+          workspace: command.workspace,
+          selection: {
+            kind: "pages",
+            indices: new Set([session.selection.pageIndex]),
+          },
+        };
+      }
       return { ...session, workspace: command.workspace };
+    }
+    case "placeStamp": {
+      const page = session.pages[command.pageIndex];
+      if (!page) {
+        return session;
+      }
+      if (page.stamps.some((stamp) => stamp.id === command.stamp.id)) {
+        return session;
+      }
+      const pages = session.pages.map((item, index) => {
+        if (index !== command.pageIndex) {
+          return item;
+        }
+        return {
+          ...clonePage(item),
+          stamps: [
+            ...item.stamps,
+            {
+              id: command.stamp.id,
+              rect: displayNormRect(command.stamp.rect),
+            },
+          ],
+        };
+      });
+      return {
+        ...session,
+        pages,
+        selection: {
+          kind: "stamp",
+          pageIndex: command.pageIndex,
+          stampId: command.stamp.id,
+        },
+        focused: command.pageIndex,
+      };
+    }
+    case "transformStamp": {
+      const page = session.pages[command.pageIndex];
+      if (!page) {
+        return session;
+      }
+      const stamp = page.stamps.find((item) => item.id === command.stampId);
+      if (!stamp || rectsEqual(stamp.rect, command.rect)) {
+        return session;
+      }
+      const pages = session.pages.map((item, index) => {
+        if (index !== command.pageIndex) {
+          return item;
+        }
+        return {
+          ...clonePage(item),
+          stamps: item.stamps.map((itemStamp) =>
+            itemStamp.id === command.stampId
+              ? { id: itemStamp.id, rect: displayNormRect(command.rect) }
+              : itemStamp,
+          ),
+        };
+      });
+      return { ...session, pages };
+    }
+    case "removeStamp": {
+      const page = session.pages[command.pageIndex];
+      if (!page || !page.stamps.some((stamp) => stamp.id === command.stampId)) {
+        return session;
+      }
+      const pages = session.pages.map((item, index) => {
+        if (index !== command.pageIndex) {
+          return item;
+        }
+        return {
+          ...clonePage(item),
+          stamps: item.stamps.filter((stamp) => stamp.id !== command.stampId),
+        };
+      });
+      return {
+        ...session,
+        pages,
+        selection: { kind: "pages", indices: new Set([command.pageIndex]) },
+      };
+    }
+    case "selectStamp": {
+      const page = session.pages[command.pageIndex];
+      if (!page || !page.stamps.some((stamp) => stamp.id === command.stampId)) {
+        return session;
+      }
+      return {
+        ...session,
+        selection: {
+          kind: "stamp",
+          pageIndex: command.pageIndex,
+          stampId: command.stampId,
+        },
+        focused: command.pageIndex,
+      };
     }
     case "undo":
     case "redo":
@@ -266,7 +430,7 @@ export function createSession(): Session {
   return {
     sources: new Map(),
     pages: [],
-    selected: new Set(),
+    selection: { kind: "pages", indices: new Set() },
     focused: null,
     workspace: "view",
     past: [],
@@ -304,27 +468,21 @@ export function apply(session: Session, command: Command): Session {
   if (next === session) {
     return session;
   }
-
-  const historyCommands = new Set([
-    "open",
-    "insert",
-    "combine",
-    "move",
-    "rotate",
-    "delete",
-  ]);
-  if (!historyCommands.has(command.type)) {
+  if (!HISTORY.has(command.type)) {
     return next;
   }
-
-  const recorded = pushHistory(session);
-  return { ...next, past: recorded.past, future: recorded.future };
+  const past = [...session.past, snapshotOf(session)];
+  if (past.length > MAX_HISTORY) {
+    past.shift();
+  }
+  return { ...next, past, future: [] };
 }
 
 export function pagesFromSource(source: Source): PageRef[] {
   return Array.from({ length: source.pageCount }, (_, pageIndex) => ({
     sourceId: source.id,
     pageIndex,
-    rotation: 0 as Rotation,
+    rotation: 0,
+    stamps: [],
   }));
 }

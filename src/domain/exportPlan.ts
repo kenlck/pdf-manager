@@ -14,6 +14,10 @@ export function buildExportPlan(session: Session): ExportPlanResult {
       sourceId: page.sourceId,
       pageIndex: page.pageIndex,
       rotation: page.rotation,
+      stamps: page.stamps.map((stamp) => ({
+        stampId: stamp.id,
+        rect: stamp.rect,
+      })),
     })),
   };
 }

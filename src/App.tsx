@@ -4,6 +4,7 @@ import type { Command } from "./domain/commands";
 import { buildExportPlan } from "./domain/exportPlan";
 import { apply, createSession, pagesFromSource } from "./domain/session";
 import type { PageRef, Source, SourceId } from "./domain/types";
+import { selectedPageIndices } from "./domain/types";
 import { openPdf } from "./pdf/openPdf";
 import { clearRenderCache } from "./pdf/render";
 import { writePdfFromPlan } from "./pdf/write";
@@ -116,8 +117,8 @@ export default function App() {
       mergeBytes(loaded.bytes);
       if (mode === "insert") {
         const afterIndex =
-          session.selected.size > 0
-            ? Math.max(...session.selected)
+          selectedPageIndices(session.selection).size > 0
+            ? Math.max(...selectedPageIndices(session.selection))
             : session.focused;
         dispatch({
           type: "insert",
@@ -135,7 +136,7 @@ export default function App() {
       });
       setStatus(`Combined ${loaded.sources.length} file(s).`);
     },
-    [mergeBytes, session.focused, session.selected],
+    [mergeBytes, session.focused, session.selection],
   );
 
   const runOpen = useCallback(
@@ -262,14 +263,15 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const pageIndices = selectedPageIndices(session.selection);
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (session.selected.size === 0) {
+        if (pageIndices.size === 0) {
           return;
         }
         event.preventDefault();
         dispatch({
           type: "delete",
-          indices: [...session.selected],
+          indices: [...pageIndices],
         });
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
@@ -279,13 +281,14 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session.selected]);
+  }, [session.selection]);
 
   const focusedPage =
     session.focused !== null ? (session.pages[session.focused] ?? null) : null;
   const focusedBytes = focusedPage
     ? sourceBytes.get(focusedPage.sourceId)
     : undefined;
+  const pageIndices = selectedPageIndices(session.selection);
 
   return (
     <div className="app">
@@ -294,7 +297,7 @@ export default function App() {
         canUndo={session.past.length > 0}
         canRedo={session.future.length > 0}
         canSave={session.pages.length > 0}
-        hasSelection={session.selected.size > 0}
+        hasSelection={pageIndices.size > 0}
         busy={busy}
         onOpen={() => void runOpen("open")}
         onInsert={() => void runOpen("insert")}
@@ -306,8 +309,8 @@ export default function App() {
           dispatch({
             type: "rotate",
             indices:
-              session.selected.size > 0
-                ? [...session.selected]
+              pageIndices.size > 0
+                ? [...pageIndices]
                 : session.focused !== null
                   ? [session.focused]
                   : [],
@@ -318,8 +321,8 @@ export default function App() {
           dispatch({
             type: "delete",
             indices:
-              session.selected.size > 0
-                ? [...session.selected]
+              pageIndices.size > 0
+                ? [...pageIndices]
                 : session.focused !== null
                   ? [session.focused]
                   : [],
@@ -343,7 +346,7 @@ export default function App() {
               sources={session.sources}
               sourceBytes={sourceBytes}
               focused={session.focused}
-              selected={session.selected}
+              selected={pageIndices}
               onFocus={(index) => dispatch({ type: "focus", index })}
               onSelect={onSelect}
               onMove={(from, to) => dispatch({ type: "move", from, to })}
@@ -360,7 +363,7 @@ export default function App() {
             pages={session.pages}
             sources={session.sources}
             sourceBytes={sourceBytes}
-            selected={session.selected}
+            selected={pageIndices}
             focused={session.focused}
             onSelect={onSelect}
             onFocus={(index) => dispatch({ type: "focus", index })}

@@ -36,8 +36,8 @@ describe("pdf open and write", () => {
     }
     const outBytes = await writePdfFromPlan(
       [
-        { sourceId: b.source.id, pageIndex: 0, rotation: 0 },
-        { sourceId: a.source.id, pageIndex: 0, rotation: 0 },
+        { sourceId: b.source.id, pageIndex: 0, rotation: 0, stamps: [] },
+        { sourceId: a.source.id, pageIndex: 0, rotation: 0, stamps: [] },
       ],
       new Map([
         [a.source.id, a.bytes],
@@ -59,10 +59,10 @@ describe("pdf open and write", () => {
     }
     const outBytes = await writePdfFromPlan(
       [
-        { sourceId: a.source.id, pageIndex: 0, rotation: 0 },
-        { sourceId: a.source.id, pageIndex: 2, rotation: 0 },
-        { sourceId: b.source.id, pageIndex: 0, rotation: 0 },
-        { sourceId: b.source.id, pageIndex: 1, rotation: 0 },
+        { sourceId: a.source.id, pageIndex: 0, rotation: 0, stamps: [] },
+        { sourceId: a.source.id, pageIndex: 2, rotation: 0, stamps: [] },
+        { sourceId: b.source.id, pageIndex: 0, rotation: 0, stamps: [] },
+        { sourceId: b.source.id, pageIndex: 1, rotation: 0, stamps: [] },
       ],
       new Map([
         [a.source.id, a.bytes],
