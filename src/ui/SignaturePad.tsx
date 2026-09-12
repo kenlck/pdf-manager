@@ -83,17 +83,20 @@ export function SignaturePad(props: SignaturePadProps) {
     if (!canvas) {
       return;
     }
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        return;
-      }
-      void blob.arrayBuffer().then((buffer) => {
-        props.onSave(new Uint8Array(buffer), {
-          width: canvas.width,
-          height: canvas.height,
-        });
-      });
-    }, "image/png");
+    const url = canvas.toDataURL("image/png");
+    const comma = url.indexOf(",");
+    if (comma < 0) {
+      return;
+    }
+    const binary = atob(url.slice(comma + 1));
+    const png = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      png[i] = binary.charCodeAt(i);
+    }
+    props.onSave(png, {
+      width: canvas.width,
+      height: canvas.height,
+    });
   }
 
   return (
