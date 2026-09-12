@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import type { PageRef, Source, SourceId } from "../domain/types";
+import type { PageRef, Source, SourceId, StampBytes } from "../domain/types";
 import { PageThumb } from "./PageThumb";
 import { usePageReorder } from "./usePageReorder";
 
@@ -11,6 +11,7 @@ type PageGridProps = {
   pages: PageRef[];
   sources: Map<SourceId, Source>;
   sourceBytes: Map<SourceId, Uint8Array>;
+  stampBytes: StampBytes;
   selected: ReadonlySet<number>;
   focused: number | null;
   onSelect: (index: number, event: MouseEvent) => void;
@@ -83,6 +84,7 @@ export function PageGrid(props: PageGridProps) {
               page={page}
               source={props.sources.get(page.sourceId)}
               bytes={props.sourceBytes.get(page.sourceId)}
+              stampBytes={props.stampBytes}
               label={`${index + 1}`}
               selected={props.selected.has(index) || props.focused === index}
               scale={0.25}

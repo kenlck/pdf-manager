@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 type ToolbarProps = {
   workspace: "view" | "organize";
   canUndo: boolean;
@@ -5,6 +7,7 @@ type ToolbarProps = {
   canSave: boolean;
   hasSelection: boolean;
   busy: boolean;
+  signatureMenu: ReactNode;
   onOpen: () => void;
   onInsert: () => void;
   onCombine: () => void;
@@ -86,6 +89,7 @@ export function Toolbar(props: ToolbarProps) {
         >
           Rotate right
         </button>
+        {props.signatureMenu}
         <button
           type="button"
           onClick={props.onDelete}
