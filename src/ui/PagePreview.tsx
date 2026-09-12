@@ -1,6 +1,5 @@
-import { useEffect, useRef } from "react";
 import type { PageRef } from "../domain/types";
-import { renderPageToCanvas } from "../pdf/render";
+import { usePageCanvas } from "./usePageCanvas";
 
 type PagePreviewProps = {
   page: PageRef | null;
@@ -10,29 +9,7 @@ type PagePreviewProps = {
 };
 
 export function PagePreview(props: PagePreviewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !props.page || !props.bytes) {
-      return;
-    }
-    let cancelled = false;
-    void renderPageToCanvas(
-      props.page.sourceId,
-      props.bytes,
-      props.page.pageIndex,
-      canvas,
-      { scale: 1.2, rotation: props.page.rotation },
-    ).catch(() => {
-      if (!cancelled) {
-        // leave blank on render failure
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [props.page, props.bytes]);
+  const canvasRef = usePageCanvas(props.page, props.bytes, 1.2);
 
   if (!props.page) {
     return (

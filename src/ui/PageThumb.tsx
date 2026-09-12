@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
 import type { MouseEvent } from "react";
 import type { PageRef, Source } from "../domain/types";
-import { renderPageToCanvas } from "../pdf/render";
+import { usePageCanvas } from "./usePageCanvas";
 import type { PageReorderItemBinding } from "./usePageReorder";
 
 type PageThumbProps = {
@@ -16,31 +15,7 @@ type PageThumbProps = {
 };
 
 export function PageThumb(props: PageThumbProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scale = props.scale ?? 0.2;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !props.bytes) {
-      return;
-    }
-    let cancelled = false;
-    void renderPageToCanvas(
-      props.page.sourceId,
-      props.bytes,
-      props.page.pageIndex,
-      canvas,
-      { scale, rotation: props.page.rotation },
-    ).catch(() => {
-      if (!cancelled && canvasRef.current) {
-        const ctx = canvasRef.current.getContext("2d");
-        ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [props.bytes, props.page, scale]);
+  const canvasRef = usePageCanvas(props.page, props.bytes, props.scale ?? 0.2, true);
 
   const sourceName = props.source
     ? props.source.path.split(/[/\\]/).pop() ?? props.source.path

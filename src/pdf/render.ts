@@ -34,19 +34,34 @@ export async function renderPageToCanvas(
   bytes: Uint8Array,
   pageIndex: number,
   canvas: HTMLCanvasElement,
-  options: { scale: number; rotation: Rotation },
+  options: { scale: number; rotation: Rotation; fitWidth?: boolean; pixelRatio?: number; signal?: AbortSignal },
 ): Promise<void> {
   const doc = await getDocument(sourceId, bytes);
   const page = await doc.getPage(pageIndex + 1);
+  if (options.signal?.aborted) return;
   const viewport = page.getViewport({
     scale: options.scale,
     rotation: options.rotation,
   });
-  canvas.width = Math.ceil(viewport.width);
-  canvas.height = Math.ceil(viewport.height);
+  // Keep CSS dimensions separate from the high-resolution backing bitmap.
+  if (!options.fitWidth) canvas.style.width = `${viewport.width}px`;
+  const displayWidth = canvas.getBoundingClientRect().width || viewport.width;
+  const outputScale = displayWidth / viewport.width * (options.pixelRatio ?? window.devicePixelRatio ?? 1);
+  canvas.width = Math.ceil(viewport.width * outputScale);
+  canvas.height = Math.ceil(viewport.height * outputScale);
   const context = canvas.getContext("2d");
   if (!context) {
     throw new Error("Could not get canvas context.");
   }
-  await page.render({ canvasContext: context, viewport, canvas }).promise;
+  const task = page.render({
+    canvasContext: context, viewport, canvas,
+    transform: [outputScale, 0, 0, outputScale, 0, 0],
+  });
+  const cancel = () => task.cancel();
+  options.signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    await task.promise;
+  } finally {
+    options.signal?.removeEventListener("abort", cancel);
+  }
 }
