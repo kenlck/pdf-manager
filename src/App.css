@@ -310,8 +310,8 @@ button:focus-visible {
   height: auto;
   background:
     repeating-conic-gradient(
-      oklch(0.38 0.02 250) 0% 25%,
-      oklch(0.3 0.02 250) 0% 50%
+      oklch(0.92 0.01 250) 0% 25%,
+      oklch(0.84 0.01 250) 0% 50%
     )
     50% / 12px 12px;
   border: 1px solid var(--border);
