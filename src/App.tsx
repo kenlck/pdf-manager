@@ -228,7 +228,7 @@ export default function App() {
         setStatus("Save cancelled.");
         return;
       }
-      const bytes = await writePdfFromPlan(plan.pages, sourceBytes);
+      const bytes = await writePdfFromPlan(plan.pages, sourceBytes, new Map());
       await writePdfBytes(path, bytes);
       setStatus(
         `Saved ${basename(path)}. Rearranging pages invalidates digital signatures.`,

@@ -47,6 +47,7 @@ describe("fixture compose path", () => {
         [a.source.id, a.bytes],
         [b.source.id, b.bytes],
       ]),
+      new Map(),
     );
     const loaded = await PDFDocument.load(outBytes);
     expect(loaded.getPageCount()).toBe(4);
