@@ -99,7 +99,7 @@ describe("pdf open and write", () => {
       rotation: 0,
     });
     expect(draw.y).toBe(200 - 20 - 30);
-    expect(draw.rotate).toBe(-0);
+    expect(draw.rotate).toBe(0);
     const outBytes = await writePdfFromPlan(
       [
         {

@@ -133,7 +133,7 @@ export function displayedRectToPdfDrawImage(
     y: origin.y,
     width,
     height,
-    rotate: -page.rotation,
+    rotate: page.rotation,
   };
 }
 

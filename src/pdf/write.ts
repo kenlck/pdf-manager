@@ -49,8 +49,7 @@ export async function writePdfFromPlan(
         y: draw.y,
         width: draw.width,
         height: draw.height,
-        // pdf-lib rotate is CCW. Geometry stores -session.rotation (CW page /Rotate).
-        rotate: degrees(-draw.rotate),
+        rotate: degrees(draw.rotate),
       });
     }
     if (page.rotation !== 0) {

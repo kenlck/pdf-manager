@@ -4,7 +4,7 @@ export type SignatureId = string & { readonly __brand: "SignatureId" };
 
 export type Rotation = 0 | 90 | 180 | 270;
 
-/** Normalized displayed viewport after pdf.js page.rotation. Origin top-left. */
+/** Unit square, top-left origin, after pdf.js page.rotation. Not PDF user space. */
 export type DisplayNormRect = {
   readonly x: number;
   readonly y: number;
@@ -25,10 +25,6 @@ export type PageRef = {
   stamps: Stamp[];
 };
 
-/**
- * Page multi-select or exactly one stamp. Empty page set is "nothing selected".
- * Stamp selection implies focused === pageIndex (enforced in apply).
- */
 export type Selection =
   | { kind: "pages"; indices: ReadonlySet<number> }
   | { kind: "stamp"; pageIndex: number; stampId: StampId };

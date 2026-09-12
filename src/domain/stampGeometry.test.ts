@@ -105,28 +105,28 @@ describe("displayedRectToPdfDrawImage", () => {
       y: 40,
       width: 80,
       height: 30,
-      rotate: -90,
+      rotate: 90,
     });
     expect(displayedRectToPdfDrawImage(rect, { ...CROP, rotation: 180 })).toEqual({
       x: 180,
       y: 100,
       width: 40,
       height: 60,
-      rotate: -180,
+      rotate: 180,
     });
     expect(displayedRectToPdfDrawImage(rect, { ...CROP, rotation: 270 })).toEqual({
       x: 150,
       y: 360,
       width: 80,
       height: 30,
-      rotate: -270,
+      rotate: 270,
     });
   });
 
-  it("sets rotate to the negation of session rotation", () => {
+  it("sets rotate to session rotation for pdf-lib", () => {
     for (const rotation of [0, 90, 180, 270] as const) {
       const draw = displayedRectToPdfDrawImage(rect, { ...CROP, rotation });
-      expect(draw.rotate).toBe(-rotation);
+      expect(draw.rotate).toBe(rotation);
     }
   });
 });
