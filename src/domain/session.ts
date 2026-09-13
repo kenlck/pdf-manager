@@ -22,6 +22,7 @@ const HISTORY = new Set([
   "delete",
   "placeStamp",
   "transformStamp",
+  "editStamp",
   "removeStamp",
 ]);
 
@@ -35,7 +36,7 @@ function clonePage(page: PageRef): PageRef {
   return {
     ...page,
     stamps: page.stamps.map((stamp) => ({
-      id: stamp.id,
+      ...stamp,
       rect: displayNormRect(stamp.rect),
     })),
   };
@@ -229,8 +230,9 @@ function applyMutating(session: Session, command: Command): Session {
           ...clonePage(page),
           rotation: normalizeRotation(page.rotation + command.delta),
           stamps: page.stamps.map((stamp) => ({
-            id: stamp.id,
+            ...stamp,
             rect: rotateDisplayRect(stamp.rect, command.delta),
+            rotation: normalizeRotation((stamp.rotation ?? 0) + command.delta),
           })),
         };
       });
@@ -344,7 +346,7 @@ function applyMutating(session: Session, command: Command): Session {
           stamps: [
             ...item.stamps,
             {
-              id: command.stamp.id,
+              ...command.stamp,
               rect: displayNormRect(command.stamp.rect),
             },
           ],
@@ -378,12 +380,24 @@ function applyMutating(session: Session, command: Command): Session {
           ...clonePage(item),
           stamps: item.stamps.map((itemStamp) =>
             itemStamp.id === command.stampId
-              ? { id: itemStamp.id, rect: displayNormRect(command.rect) }
+              ? { ...itemStamp, rect: displayNormRect(command.rect) }
               : itemStamp,
           ),
         };
       });
       return { ...session, pages };
+    }
+    case "editStamp": {
+      const page = session.pages[command.pageIndex];
+      const previous = page?.stamps.find((stamp) => stamp.id === command.stamp.id);
+      if (!previous || JSON.stringify(previous) === JSON.stringify(command.stamp)) return session;
+      return {
+        ...session,
+        pages: session.pages.map((item, index) => index === command.pageIndex
+          ? { ...item, stamps: item.stamps.map((stamp) => stamp.id === command.stamp.id
+            ? { ...command.stamp, rect: displayNormRect(command.stamp.rect) } : stamp) }
+          : item),
+      };
     }
     case "removeStamp": {
       const page = session.pages[command.pageIndex];

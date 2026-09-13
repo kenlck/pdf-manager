@@ -41,7 +41,7 @@ export async function renderPageToCanvas(
   if (options.signal?.aborted) return;
   const viewport = page.getViewport({
     scale: options.scale,
-    rotation: options.rotation,
+    rotation: (page.rotate + options.rotation) % 360,
   });
   // Keep CSS dimensions separate from the high-resolution backing bitmap.
   if (!options.fitWidth) canvas.style.width = `${viewport.width}px`;

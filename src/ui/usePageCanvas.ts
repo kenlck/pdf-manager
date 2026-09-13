@@ -39,7 +39,7 @@ export function usePageCanvas(page: PageRef | null, bytes: Uint8Array | undefine
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [page, bytes, scale, fitWidth]);
+  }, [page?.sourceId, page?.pageIndex, page?.rotation, bytes, scale, fitWidth]);
 
   return canvasRef;
 }

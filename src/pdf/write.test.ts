@@ -1,7 +1,7 @@
-import { PDFDict, PDFDocument, PDFName, StandardFonts, rgb } from "pdf-lib";
-import { describe, expect, it } from "vitest";
+import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees, rgb } from "pdf-lib";
+import { describe, expect, it, vi } from "vitest";
 import { displayedRectToPdfDrawImage, displayNormRect } from "../domain/stampGeometry";
-import { asSourceId, asStampId } from "../domain/types";
+import { asSourceId, asStampId, type MarkupContent } from "../domain/types";
 import { openPdf, resetSourceCounter } from "./openPdf";
 import { writePdfFromPlan } from "./write";
 
@@ -16,6 +16,33 @@ async function makeDoc(labels: string[]): Promise<Uint8Array> {
 }
 
 describe("pdf open and write", () => {
+  it.each([90, -270])("exports mixed artwork in stacking order on cropped pages rotated %s degrees", async (initialRotation) => {
+    const png = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+    const doc = await PDFDocument.create();
+    const sourcePage = doc.addPage([600, 800]);
+    sourcePage.setCropBox(20, 30, 400, 600);
+    sourcePage.setRotation(degrees(initialRotation));
+    const content: MarkupContent[] = [
+      { kind: "text", text: "Edited 中文", color: "#123456", width: 200, height: 40, fontSize: 24 },
+      { kind: "rectangle", color: "#123456", width: 200, height: 40, strokeWidth: 3, fill: "none" },
+      { kind: "ellipse", color: "#123456", width: 200, height: 40, strokeWidth: 3, fill: "#abcdef" },
+      { kind: "line", color: "#123456", width: 200, height: 40, strokeWidth: 3, points: [{ x: 0, y: 0 }, { x: 200, y: 40 }] },
+      { kind: "pencil", color: "#123456", width: 200, height: 40, strokeWidth: 3, points: [{ x: 10, y: 10 }] },
+    ];
+    const rasterize = vi.fn(async (_content: MarkupContent, _width: number, _height: number) => png);
+    const id = asSourceId("mixed");
+    const rect = displayNormRect({ x: 0.1, y: 0.2, w: 0.3, h: 0.1 });
+    const output = await writePdfFromPlan([{ sourceId: id, pageIndex: 0, rotation: 90, stamps: [
+      { stampId: asStampId("image"), rect },
+      ...content.map((item, i) => ({ stampId: asStampId(`markup-${i}`), content: item, rect, rotation: 90 as const })),
+    ] }], new Map([[id, await doc.save()]]), new Map([[asStampId("image"), png]]), rasterize);
+    const saved = await PDFDocument.load(output);
+    expect(saved.getPages()[0].getRotation().angle).toBe(180);
+    expect(saved.getPages()[0].getCropBox()).toEqual({ x: 20, y: 30, width: 400, height: 600 });
+    expect(rasterize.mock.calls.map((call) => call[0])).toEqual(content);
+    expect(rasterize).toHaveBeenNthCalledWith(1, content[0], 60, 120);
+    expect(saved.getPages()[0].node.Resources()?.lookup(PDFName.of("XObject"), PDFDict).keys()).toHaveLength(6);
+  });
   it("rejects non-pdf bytes", async () => {
     resetSourceCounter();
     const result = await openPdf(new TextEncoder().encode("hello"), "/tmp/x.txt");

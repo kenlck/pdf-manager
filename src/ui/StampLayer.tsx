@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   MIN_NORM_SIDE,
-  aspectFromPixelSize,
   displayNormRect,
   rectsEqual,
 } from "../domain/stampGeometry";
+import { artworkUrl } from "../markup/artwork";
 import type { DisplayNormRect, Stamp, StampBytes, StampId } from "../domain/types";
 
 type Point = { x: number; y: number };
@@ -31,17 +31,6 @@ type StampLayerProps = {
   onCommit?: (stampId: StampId, rect: DisplayNormRect) => void;
   onSelectPage?: () => void;
 };
-
-function pngAspect(bytes: Uint8Array): number {
-  if (bytes.length < 24) {
-    return 2.5;
-  }
-  const width =
-    ((bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]) >>> 0;
-  const height =
-    ((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]) >>> 0;
-  return aspectFromPixelSize({ width, height });
-}
 
 function clientToNorm(
   event: PointerEvent | ReactPointerEvent,
@@ -91,14 +80,19 @@ function applyResize(
 
 export function StampLayer(props: StampLayerProps) {
   const layerRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLDivElement>(null);
   const [urls, setUrls] = useState<Map<StampId, string>>(() => new Map());
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [draftRect, setDraftRect] = useState<DisplayNormRect | null>(null);
 
   useEffect(() => {
+    if (props.interactive) selectedRef.current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [props.selectedStampId, props.interactive]);
+
+  useEffect(() => {
     const next = new Map<StampId, string>();
     for (const [id, bytes] of props.stampBytes) {
-      next.set(id, URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
+      next.set(id, URL.createObjectURL(new Blob([bytes], { type: bytes[0] === 0xff ? "image/jpeg" : "image/png" })));
     }
     setUrls(next);
     return () => {
@@ -116,7 +110,7 @@ export function StampLayer(props: StampLayerProps) {
   }
 
   function onLayerPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!props.interactive) {
+    if (!props.interactive || event.button !== 0) {
       return;
     }
     if (event.target !== event.currentTarget) {
@@ -129,7 +123,7 @@ export function StampLayer(props: StampLayerProps) {
     event: ReactPointerEvent<HTMLDivElement>,
     stamp: Stamp,
   ) {
-    if (!props.interactive) {
+    if (!props.interactive || event.button !== 0) {
       return;
     }
     event.stopPropagation();
@@ -154,7 +148,7 @@ export function StampLayer(props: StampLayerProps) {
     stamp: Stamp,
     corner: Corner,
   ) {
-    if (!props.interactive) {
+    if (!props.interactive || event.button !== 0) {
       return;
     }
     event.stopPropagation();
@@ -184,8 +178,7 @@ export function StampLayer(props: StampLayerProps) {
       setDraftRect(applyMove(gesture.origin, gesture.start, point));
       return;
     }
-    const bytes = props.stampBytes.get(gesture.stampId);
-    const aspect = bytes ? pngAspect(bytes) : 2.5;
+    const aspect = gesture.origin.w / gesture.origin.h;
     setDraftRect(applyResize(gesture.origin, gesture.corner, point, aspect));
   }
 
@@ -211,15 +204,19 @@ export function StampLayer(props: StampLayerProps) {
       onPointerDown={onLayerPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={() => { setGesture(null); setDraftRect(null); }}
+      onLostPointerCapture={() => { setGesture(null); setDraftRect(null); }}
     >
       {props.stamps.map((stamp) => {
         const rect = paintedRect(stamp);
         const selected = props.selectedStampId === stamp.id;
-        const src = urls.get(stamp.id);
+        const src = stamp.content ? artworkUrl(stamp.content) : urls.get(stamp.id);
+        const rotation = stamp.rotation ?? 0;
+        const swapped = rotation === 90 || rotation === 270;
         return (
           <div
             key={stamp.id}
+            ref={selected ? selectedRef : undefined}
             className={`stamp${selected ? " selected" : ""}`}
             style={{
               left: `${rect.x * 100}%`,
@@ -227,9 +224,14 @@ export function StampLayer(props: StampLayerProps) {
               width: `${rect.w * 100}%`,
               height: `${rect.h * 100}%`,
             }}
+            role={props.interactive ? "button" : undefined}
+            tabIndex={props.interactive ? 0 : undefined}
+            aria-label={props.interactive ? `Select ${stamp.label ?? stamp.content?.kind ?? "signature"}` : undefined}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); props.onSelect?.(stamp.id); } }}
             onPointerDown={(event) => onStampPointerDown(event, stamp)}
           >
-            {src ? <img src={src} alt="" draggable={false} /> : null}
+            {src ? <img src={src} alt={stamp.content?.kind === "text" ? stamp.content.text : stamp.label ?? stamp.content?.kind ?? "Signature"} draggable={false}
+              style={swapped ? { position: "absolute", left: "50%", top: "50%", width: "100cqh", height: "100cqw", transform: `translate(-50%, -50%) rotate(${rotation}deg)` } : { transform: `rotate(${rotation}deg)` }} /> : null}
             {props.interactive && selected ? (
               <>
                 {(["nw", "ne", "sw", "se"] satisfies readonly Corner[]).map((corner) => (

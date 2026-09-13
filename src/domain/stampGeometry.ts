@@ -146,3 +146,18 @@ export function aspectFromPixelSize(size: {
   }
   return size.width / size.height;
 }
+
+/** Rotate artwork clockwise within its display rectangle, then map into PDF space. */
+export function rotatedArtworkDraw(draw: PdfDrawImageArgs, rotation: Rotation): PdfDrawImageArgs {
+  const swapped = rotation === 90 || rotation === 270;
+  const x = rotation === 180 || rotation === 270 ? draw.width : 0;
+  const y = rotation === 90 || rotation === 180 ? draw.height : 0;
+  const radians = draw.rotate * Math.PI / 180;
+  return {
+    x: draw.x + x * Math.cos(radians) - y * Math.sin(radians),
+    y: draw.y + x * Math.sin(radians) + y * Math.cos(radians),
+    width: swapped ? draw.height : draw.width,
+    height: swapped ? draw.width : draw.height,
+    rotate: draw.rotate - rotation,
+  };
+}

@@ -100,7 +100,7 @@ function mimeFromPath(path: string): string {
   return "application/octet-stream";
 }
 
-export async function pickImage(): Promise<PickedImage | null> {
+export async function pickImage(title = "Choose a signature image"): Promise<PickedImage | null> {
   if (!isTauriRuntime()) {
     const files = await pickViaInput(false, "image/png,image/jpeg");
     if (!files || files.length === 0) {
@@ -117,7 +117,7 @@ export async function pickImage(): Promise<PickedImage | null> {
   const result = await open({
     multiple: false,
     filters: IMAGE_FILTER,
-    title: "Choose a signature image",
+    title,
   });
   if (result === null || Array.isArray(result)) {
     return null;

@@ -17,6 +17,8 @@ export function buildExportPlan(session: Session): ExportPlanResult {
       stamps: page.stamps.map((stamp) => ({
         stampId: stamp.id,
         rect: stamp.rect,
+        content: stamp.content,
+        rotation: stamp.rotation,
       })),
     })),
   };

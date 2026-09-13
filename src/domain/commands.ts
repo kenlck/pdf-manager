@@ -20,6 +20,7 @@ export type Command =
   | { type: "setWorkspace"; workspace: "view" | "organize" }
   | { type: "placeStamp"; pageIndex: number; stamp: Stamp }
   | { type: "transformStamp"; pageIndex: number; stampId: StampId; rect: DisplayNormRect }
+  | { type: "editStamp"; pageIndex: number; stamp: Stamp }
   | { type: "removeStamp"; pageIndex: number; stampId: StampId }
   | { type: "selectStamp"; pageIndex: number; stampId: StampId }
   | { type: "undo" }

@@ -3,8 +3,8 @@ import type { MouseEvent } from "react";
 import type { Command } from "./domain/commands";
 import { buildExportPlan } from "./domain/exportPlan";
 import { apply, createSession, pagesFromSource } from "./domain/session";
-import { aspectFromPixelSize, defaultStampRect } from "./domain/stampGeometry";
-import type { PageRef, SignatureId, Source, SourceId, StampBytes } from "./domain/types";
+import { aspectFromPixelSize, defaultStampRect, displayNormRect } from "./domain/stampGeometry";
+import type { PageRef, SignatureId, Source, SourceId, StampBytes, Stamp, MarkupContent, MarkupTool } from "./domain/types";
 import {
   mintStampId,
   selectedPageIndices,
@@ -35,6 +35,9 @@ import { PageGrid } from "./ui/PageGrid";
 import { PagePreview } from "./ui/PagePreview";
 import { PageRail } from "./ui/PageRail";
 import { SignatureMenu } from "./ui/SignatureMenu";
+import { DEFAULT_STYLE, textContent } from "./markup/artwork";
+import { importOverlayImage } from "./markup/importImage";
+import { MarkupToolbar } from "./ui/MarkupToolbar";
 import { Toolbar } from "./ui/Toolbar";
 import "./App.css";
 
@@ -101,6 +104,8 @@ export default function App() {
   );
   const [sourceBytes, setSourceBytes] = useState<SourceBytes>(() => new Map());
   const [stampBytes, setStampBytes] = useState<StampBytes>(() => new Map());
+  const [tool, setTool] = useState<MarkupTool>("select");
+  const [markupStyle, setMarkupStyle] = useState(DEFAULT_STYLE);
   const [vault, setVault] = useState(loadVault);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -135,8 +140,8 @@ export default function App() {
       }
       if (mode === "open") {
         clearRenderCache();
-        setStampBytes(new Map());
-        setSourceBytes(loaded.bytes);
+        setTool("select");
+        mergeBytes(loaded.bytes);
         dispatch({
           type: "open",
           sources: loaded.sources,
@@ -221,8 +226,8 @@ export default function App() {
           return;
         }
         clearRenderCache();
-        setStampBytes(new Map());
-        setSourceBytes(loaded.bytes);
+        setTool("select");
+        mergeBytes(loaded.bytes);
         dispatch({
           type: "open",
           sources: loaded.sources,
@@ -294,10 +299,12 @@ export default function App() {
         stamp: {
           id: stampId,
           rect: defaultStampRect(
-            aspectFromPixelSize(info.pixelSize),
+            aspectFromPixelSize(info.pixelSize) / pageAspect(),
           ),
         },
       });
+      setTool("select");
+      dispatch({ type: "setWorkspace", workspace: "view" });
       setStatus("Signature placed.");
     },
     [session.focused, vault],
@@ -326,6 +333,9 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTool("select");
+      if (busy) return;
+      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true]")) return;
       if (
         (event.key === "Delete" || event.key === "Backspace") &&
         event.target instanceof HTMLElement &&
@@ -342,7 +352,7 @@ export default function App() {
             pageIndex: stamp.pageIndex,
             stampId: stamp.stampId,
           });
-          setStatus("Signature removed.");
+          setStatus("Object removed.");
           return;
         }
         const indices = [...selectedPageIndices(session.selection)];
@@ -359,7 +369,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session.selection]);
+  }, [session.selection, busy]);
 
   const focusedPage =
     session.focused !== null ? (session.pages[session.focused] ?? null) : null;
@@ -369,6 +379,63 @@ export default function App() {
   const pageIndices = selectedPageIndices(session.selection);
   const stampSel = selectedStamp(session.selection);
 
+  const selectedObject = stampSel ? session.pages[stampSel.pageIndex]?.stamps.find((stamp) => stamp.id === stampSel.stampId) : undefined;
+
+  function pageAspect() {
+    const bounds = document.querySelector(".page-preview .page-stack")?.getBoundingClientRect();
+    return bounds && bounds.width > 0 && bounds.height > 0 ? bounds.width / bounds.height : 0.8;
+  }
+
+  function placeObject(stamp: Stamp) {
+    if (session.focused === null || busy) return;
+    dispatch({ type: "placeStamp", pageIndex: session.focused, stamp });
+    setStatus(`${stamp.label ?? stamp.content?.kind ?? "Object"} added.`);
+  }
+
+  function addText() {
+    if (session.focused === null) return;
+    setTool("select");
+    const content = textContent("Text", markupStyle.fontSize, markupStyle.color);
+    const w = Math.min(0.8, content.width / 800);
+    const h = Math.min(0.8, content.height / 800 * pageAspect());
+    placeObject({ id: mintStampId(), content, rect: displayNormRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h }) });
+  }
+
+  async function addImage() {
+    if (session.focused === null) return;
+    const pageIndex = session.focused;
+    const aspect = pageAspect();
+    setBusy(true);
+    setError(null);
+    try {
+      const picked = await pickImage("Choose an image to overlay");
+      if (!picked) return;
+      const image = await importOverlayImage(picked.bytes);
+      const id = mintStampId();
+      setStampBytes((previous) => new Map(previous).set(id, image.bytes));
+      dispatch({ type: "placeStamp", pageIndex, stamp: { id, label: basename(picked.path), rect: defaultStampRect(image.width / image.height / aspect) } });
+      setTool("select");
+      setStatus("Image added. Drag it to move; use a corner to resize.");
+    } catch {
+      setError("Could not insert that image. Choose a valid PNG or JPEG.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function editObject(content: MarkupContent) {
+    if (!selectedObject || !stampSel) return;
+    let rect = selectedObject.rect;
+    const previous = selectedObject.content;
+    if (previous?.kind === "text" && content.kind === "text") {
+      const swapped = selectedObject.rotation === 90 || selectedObject.rotation === 270;
+      const scaleW = swapped ? content.height / previous.height : content.width / previous.width;
+      const scaleH = swapped ? content.width / previous.width : content.height / previous.height;
+      rect = displayNormRect({ ...rect, w: rect.w * scaleW, h: rect.h * scaleH });
+    }
+    dispatch({ type: "editStamp", pageIndex: stampSel.pageIndex, stamp: { ...selectedObject, rect, content } });
+  }
+
   function onDelete() {
     if (stampSel) {
       dispatch({
@@ -376,7 +443,7 @@ export default function App() {
         pageIndex: stampSel.pageIndex,
         stampId: stampSel.stampId,
       });
-      setStatus("Signature removed.");
+      setStatus("Object removed.");
       return;
     }
     dispatch({
@@ -489,9 +556,7 @@ export default function App() {
           })
         }
         onDelete={onDelete}
-        onWorkspace={(workspace) =>
-          dispatch({ type: "setWorkspace", workspace })
-        }
+        onWorkspace={(workspace) => { setTool("select"); dispatch({ type: "setWorkspace", workspace }); }}
       />
       {(error || browserNote) && (
         <div className="banner" role="status">
@@ -501,6 +566,10 @@ export default function App() {
       )}
       <main className="workspace">
         {session.workspace === "view" ? (
+          <div className="editor-layout">
+            <MarkupToolbar tool={tool} style={markupStyle} disabled={busy || !focusedPage} selected={tool === "select" ? selectedObject : undefined}
+              onTool={(next) => { setTool(next); if (next !== "select" && session.focused !== null) dispatch({ type: "select", indices: [], mode: "replace" }); }}
+              onStyle={setMarkupStyle} onImage={() => void addImage()} onText={addText} onEdit={editObject} />
           <div className="view-layout">
             <PageRail
               pages={session.pages}
@@ -514,6 +583,10 @@ export default function App() {
               onMove={(from, to) => dispatch({ type: "move", from, to })}
             />
             <PagePreview
+              tool={tool}
+              markupStyle={markupStyle}
+              onPlace={placeObject}
+              busy={busy}
               page={focusedPage}
               bytes={focusedBytes}
               pageNumber={session.focused !== null ? session.focused + 1 : null}
@@ -552,6 +625,7 @@ export default function App() {
                 });
               }}
             />
+          </div>
           </div>
         ) : (
           <PageGrid

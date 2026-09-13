@@ -16,7 +16,22 @@ export type DisplayNormRect = {
 export type Stamp = {
   readonly id: StampId;
   readonly rect: DisplayNormRect;
+  readonly content?: MarkupContent;
+  readonly rotation?: Rotation;
+  readonly label?: string;
 };
+
+export type MarkupTool = "select" | "pencil" | "rectangle" | "ellipse" | "line";
+export type MarkupPoint = { readonly x: number; readonly y: number };
+export type MarkupContent = {
+  readonly width: number;
+  readonly height: number;
+  readonly color: string;
+} & (
+  | { readonly kind: "text"; readonly text: string; readonly fontSize: number }
+  | { readonly kind: "pencil" | "line"; readonly points: readonly MarkupPoint[]; readonly strokeWidth: number }
+  | { readonly kind: "rectangle" | "ellipse"; readonly strokeWidth: number; readonly fill: string }
+);
 
 export type PageRef = {
   sourceId: SourceId;
@@ -51,6 +66,8 @@ export type Session = SessionSnapshot & {
 export type ExportStamp = {
   stampId: StampId;
   rect: DisplayNormRect;
+  content?: MarkupContent;
+  rotation?: Rotation;
 };
 
 export type ExportPage = {

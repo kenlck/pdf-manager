@@ -1,6 +1,7 @@
 import { PDFDocument, degrees } from "pdf-lib";
-import { displayedRectToPdfDrawImage } from "../domain/stampGeometry";
-import type { ExportPage, SourceId, StampBytes } from "../domain/types";
+import { displayedRectToPdfDrawImage, rotatedArtworkDraw } from "../domain/stampGeometry";
+import type { ExportPage, Rotation, SourceId, StampBytes } from "../domain/types";
+import { rasterizeArtwork } from "../markup/artwork";
 
 export type SourceBytes = Map<SourceId, Uint8Array>;
 
@@ -8,6 +9,7 @@ export async function writePdfFromPlan(
   plan: ExportPage[],
   sourceBytes: SourceBytes,
   stampBytes: StampBytes,
+  renderArtwork = rasterizeArtwork,
 ): Promise<Uint8Array> {
   if (plan.length === 0) {
     throw new Error("Cannot write an empty PDF.");
@@ -33,29 +35,27 @@ export async function writePdfFromPlan(
     const sourceDoc = loaded.get(page.sourceId)!;
     const [copied] = await out.copyPages(sourceDoc, [page.pageIndex]);
     const box = copied.getCropBox();
+    const rotation = (((copied.getRotation().angle + page.rotation) % 360 + 360) % 360) as Rotation;
     for (const stamp of page.stamps) {
-      const png = stampBytes.get(stamp.stampId);
-      if (!png) {
-        throw new Error(`Missing stamp bytes ${stamp.stampId}`);
-      }
-      const image = await out.embedPng(png);
-      const draw = displayedRectToPdfDrawImage(stamp.rect, {
+      const draw = rotatedArtworkDraw(displayedRectToPdfDrawImage(stamp.rect, {
         cropWidth: box.width,
         cropHeight: box.height,
-        rotation: page.rotation,
-      });
+        rotation,
+      }), stamp.rotation ?? 0);
+      const bytes = stamp.content
+        ? await renderArtwork(stamp.content, draw.width, draw.height)
+        : stampBytes.get(stamp.stampId);
+      if (!bytes) throw new Error(`Missing stamp bytes ${stamp.stampId}`);
+      const image = bytes[0] === 0xff ? await out.embedJpg(bytes) : await out.embedPng(bytes);
       copied.drawImage(image, {
-        x: draw.x,
-        y: draw.y,
+        x: draw.x + box.x,
+        y: draw.y + box.y,
         width: draw.width,
         height: draw.height,
         rotate: degrees(draw.rotate),
       });
     }
-    if (page.rotation !== 0) {
-      const current = copied.getRotation().angle;
-      copied.setRotation(degrees(current + page.rotation));
-    }
+    copied.setRotation(degrees(rotation));
     out.addPage(copied);
   }
 

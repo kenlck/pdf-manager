@@ -179,6 +179,9 @@ button:focus-visible {
   position: absolute;
   box-sizing: border-box;
   touch-action: none;
+  container-type: size;
+  cursor: move;
+  scroll-margin: 12px;
 }
 
 .stamp img {
@@ -192,8 +195,28 @@ button:focus-visible {
 .stamp.selected {
   outline: 1px solid var(--accent);
   outline-offset: 0;
-  z-index: 2;
 }
+
+.editor-layout { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+.markup-panel { background: var(--surface); border-bottom: 1px solid var(--border); }
+.markup-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin: 0; padding: 0.65rem 0.85rem 0.35rem; border: 0; min-width: 0; }
+.markup-label { text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-size: 10px; font-weight: 600; }
+.markup-toolbar button { display: inline-flex; align-items: center; gap: 0.35rem; }
+.markup-toolbar button[aria-pressed="true"] { color: var(--accent-ink); background: var(--accent); border-color: transparent; }
+.markup-toolbar svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.markup-properties { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; border-left: 1px solid var(--border); padding-left: 0.75rem; }
+.markup-properties label { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 12px; }
+.markup-properties input[type="color"] { width: 30px; height: 28px; padding: 2px; cursor: pointer; }
+.markup-properties input, .markup-properties select, .text-editor textarea { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
+.markup-properties select { padding: 4px; }
+.markup-hint { margin: 0; padding: 0.2rem 0.85rem 0.5rem; color: var(--muted); font-size: 11px; }
+.text-editor { display: flex; align-items: center; gap: 0.7rem; padding: 0.4rem 0.85rem; font-size: 12px; }
+.text-editor textarea { padding: 0.45rem; width: min(440px, 60vw); resize: vertical; min-height: 48px; max-height: 150px; }
+.text-editor span { color: var(--muted); max-width: 250px; }
+.drawing-layer { position: absolute; inset: 0; touch-action: none; cursor: crosshair; overflow: hidden; }
+.drawing-layer img { pointer-events: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+textarea:focus-visible, input:focus-visible, select:focus-visible, .stamp:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .stamp-handle {
   position: absolute;
