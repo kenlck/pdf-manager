@@ -191,6 +191,7 @@ button:focus-visible {
 .view-layout {
   display: grid;
   grid-template-columns: 128px 1fr;
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
@@ -220,6 +221,7 @@ button:focus-visible {
 }
 
 .page-preview.empty {
+  place-content: center;
   place-items: center;
   color: var(--muted);
 }
@@ -324,6 +326,11 @@ button:focus-visible {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
+  min-height: 0;
+}
+
+.editor-layout:not(:has(.markup-panel)) {
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .markup-panel {

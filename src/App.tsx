@@ -567,9 +567,11 @@ export default function App() {
       <main className="workspace">
         {session.workspace === "view" ? (
           <div className="editor-layout">
+            {focusedPage ? (
             <MarkupToolbar tool={tool} style={markupStyle} disabled={busy || !focusedPage} selected={tool === "select" ? selectedObject : undefined}
               onTool={(next) => { setTool(next); if (next !== "select" && session.focused !== null) dispatch({ type: "select", indices: [], mode: "replace" }); }}
               onStyle={setMarkupStyle} onImage={() => void addImage()} onText={addText} onEdit={editObject} />
+            ) : null}
           <div className="view-layout">
             {session.pages.length > 0 ? (
             <PageRail
