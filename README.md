@@ -5,6 +5,8 @@ Local desktop app for viewing PDFs and composing pages into a new file.
 ## What it does
 
 - Open and view a PDF
+- Open or drop PDFs, PNGs, and JPEGs to open them or append to the current document
+- Each image becomes one page at its original aspect ratio, with no cropping
 - Organize pages (reorder, rotate, delete)
 - Insert pages from other PDFs
 - Combine multiple PDFs into one board, then Save as
@@ -23,6 +25,10 @@ npm run fixtures
 npm test
 npm run tauri dev
 ```
+
+The window sets `dragDropEnabled: false` so HTML drag events reach React.
+Keep file imports and thumbnail reordering on this same event path; Tauri’s
+native drag handler intercepts HTML drag and drop on Windows.
 
 ## Stack
 

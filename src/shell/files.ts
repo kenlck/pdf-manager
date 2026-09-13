@@ -1,9 +1,10 @@
+import { DOCUMENT_ACCEPT, DOCUMENT_EXTENSIONS } from "../pdf/openDocument";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readFile, writeFile } from "@tauri-apps/plugin-fs";
 
 const PDF_FILTER = [{ name: "PDF", extensions: ["pdf"] }];
 
-export type PickedPdf = {
+export type PickedDocument = {
   path: string;
   bytes: Uint8Array;
 };
@@ -48,7 +49,7 @@ function pickViaInput(multiple: boolean, accept: string): Promise<File[] | null>
   });
 }
 
-async function filesToPicked(files: File[]): Promise<PickedPdf[]> {
+async function filesToPicked(files: File[]): Promise<PickedDocument[]> {
   return Promise.all(
     files.map(async (file) => ({
       path: file.name,
@@ -57,11 +58,11 @@ async function filesToPicked(files: File[]): Promise<PickedPdf[]> {
   );
 }
 
-export async function pickOpenPdfs(
+export async function pickOpenDocuments(
   multiple: boolean,
-): Promise<PickedPdf[] | null> {
+): Promise<PickedDocument[] | null> {
   if (!isTauriRuntime()) {
-    const files = await pickViaInput(multiple, "application/pdf,.pdf");
+    const files = await pickViaInput(multiple, DOCUMENT_ACCEPT);
     if (!files) {
       return null;
     }
@@ -70,14 +71,14 @@ export async function pickOpenPdfs(
 
   const result = await open({
     multiple,
-    filters: PDF_FILTER,
-    title: multiple ? "Choose PDF files" : "Open PDF",
+    filters: [{ name: "PDFs and images", extensions: DOCUMENT_EXTENSIONS }],
+    title: multiple ? "Choose PDFs or images" : "Open PDF or image",
   });
   if (result === null) {
     return null;
   }
   const paths = Array.isArray(result) ? result : [result];
-  const picked: PickedPdf[] = [];
+  const picked: PickedDocument[] = [];
   for (const path of paths) {
     picked.push({ path, bytes: await readFile(path) });
   }
@@ -154,8 +155,8 @@ export async function writePdfBytes(
 
 export async function loadPdfsFromUrls(
   urls: string[],
-): Promise<PickedPdf[]> {
-  const picked: PickedPdf[] = [];
+): Promise<PickedDocument[]> {
+  const picked: PickedDocument[] = [];
   for (const url of urls) {
     const response = await fetch(url);
     if (!response.ok) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import type { Command } from "./domain/commands";
 import { buildExportPlan } from "./domain/exportPlan";
@@ -10,16 +10,16 @@ import {
   selectedPageIndices,
   selectedStamp,
 } from "./domain/types";
-import { openPdf } from "./pdf/openPdf";
+import { isSupportedDocument, openDocument } from "./pdf/openDocument";
 import { clearRenderCache } from "./pdf/render";
 import { writePdfFromPlan } from "./pdf/write";
 import {
   isTauriRuntime,
   loadPdfsFromUrls,
   pickImage,
-  pickOpenPdfs,
+  pickOpenDocuments,
   pickSavePdf,
-  type PickedPdf,
+  type PickedDocument,
   writePdfBytes,
 } from "./shell/files";
 import {
@@ -64,7 +64,7 @@ function vaultMessage(error: VaultError): string {
   }
 }
 
-async function loadSources(picked: PickedPdf[]): Promise<{
+async function loadSources(picked: PickedDocument[]): Promise<{
   sources: Source[];
   pages: PageRef[];
   bytes: SourceBytes;
@@ -77,7 +77,7 @@ async function loadSources(picked: PickedPdf[]): Promise<{
 
   for (const item of picked) {
     try {
-      const result = await openPdf(item.bytes, item.path);
+      const result = await openDocument(item.bytes, item.path);
       if (!result.ok) {
         errors.push(`${basename(item.path)}: ${result.error.message}`);
         continue;
@@ -86,7 +86,7 @@ async function loadSources(picked: PickedPdf[]): Promise<{
       pages.push(...pagesFromSource(result.source));
       bytes.set(result.source.id, result.bytes);
     } catch {
-      errors.push(`${basename(item.path)}: This PDF could not be read.`);
+      errors.push(`${basename(item.path)}: This file could not be read.`);
     }
   }
 
@@ -104,8 +104,9 @@ export default function App() {
   const [vault, setVault] = useState(loadVault);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("Open a PDF to begin.");
+  const [status, setStatus] = useState("Open a PDF or image to begin.");
   const [browserNote, setBrowserNote] = useState(false);
+  const dropInProgress = useRef(false);
 
   useEffect(() => {
     setBrowserNote(!isTauriRuntime());
@@ -176,7 +177,7 @@ export default function App() {
       setError(null);
       setBusy(true);
       try {
-        const picked = await pickOpenPdfs(mode !== "open");
+        const picked = await pickOpenDocuments(mode !== "open");
         if (!picked || picked.length === 0) {
           setStatus("Cancelled.");
           return;
@@ -390,7 +391,42 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      onDragOver={(event) => {
+        if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = busy ? "none" : "copy";
+      }}
+      onDrop={(event) => {
+        const files = Array.from(event.dataTransfer.files);
+        if (files.length === 0) return;
+        event.preventDefault();
+        if (busy || dropInProgress.current) return;
+        const documents = files.filter(isSupportedDocument);
+        if (documents.length === 0) {
+          setError("Drop PDF, PNG, or JPEG files to add pages.");
+          return;
+        }
+        dropInProgress.current = true;
+        setBusy(true);
+        setError(null);
+        void (async () => {
+          try {
+            const picked = await Promise.all(documents.map(async (file) => ({
+              path: file.name,
+              bytes: new Uint8Array(await file.arrayBuffer()),
+            })));
+            applyLoaded(session.pages.length === 0 ? "open" : "combine", await loadSources(picked));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not read dropped files.");
+          } finally {
+            dropInProgress.current = false;
+            setBusy(false);
+          }
+        })();
+      }}
+    >
       <Toolbar
         workspace={session.workspace}
         canUndo={session.past.length > 0}

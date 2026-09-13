@@ -20,7 +20,7 @@ export function PagePreview(props: PagePreviewProps) {
   if (!props.page) {
     return (
       <section className="page-preview empty">
-        <p>Open a PDF to begin.</p>
+        <p>Open a PDF or image to begin.</p>
       </section>
     );
   }
