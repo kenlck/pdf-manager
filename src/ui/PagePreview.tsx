@@ -18,6 +18,8 @@ type PagePreviewProps = {
   markupStyle: MarkupStyle;
   onPlace: (stamp: Stamp) => void;
   busy: boolean;
+  onOpen: () => void;
+  onCombine: () => void;
 };
 
 export function PagePreview(props: PagePreviewProps) {
@@ -26,7 +28,18 @@ export function PagePreview(props: PagePreviewProps) {
   if (!props.page) {
     return (
       <section className="page-preview empty">
-        <p>Open a PDF or image to begin.</p>
+        <div className="empty-hero">
+          <h2>Open a PDF</h2>
+          <p>Drop a file here, or choose Open. Insert and Combine stay available after the first document.</p>
+          <div className="empty-actions">
+            <button type="button" className="pill blue" onClick={props.onOpen} disabled={props.busy}>
+              Open
+            </button>
+            <button type="button" className="pill" onClick={props.onCombine} disabled={props.busy}>
+              Combine
+            </button>
+          </div>
+        </div>
       </section>
     );
   }
@@ -48,8 +61,8 @@ export function PagePreview(props: PagePreviewProps) {
           {!props.busy && props.tool !== "select" && <DrawingLayer key={`${props.page.sourceId}-${props.page.pageIndex}-${props.page.rotation}-${props.tool}`} tool={props.tool} style={props.markupStyle} onPlace={props.onPlace} />}
         </div>
       </div>
-      <p className="page-preview-status">
-        Page {props.pageNumber} of {props.total}
+      <p className="page-badge">
+        {props.pageNumber} of {props.total}
       </p>
     </section>
   );

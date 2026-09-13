@@ -14,7 +14,6 @@ import { isSupportedDocument, openDocument } from "./pdf/openDocument";
 import { clearRenderCache } from "./pdf/render";
 import { writePdfFromPlan } from "./pdf/write";
 import {
-  isTauriRuntime,
   loadPdfsFromUrls,
   pickImage,
   pickOpenDocuments,
@@ -110,12 +109,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Open a PDF or image to begin.");
-  const [browserNote, setBrowserNote] = useState(false);
   const dropInProgress = useRef(false);
-
-  useEffect(() => {
-    setBrowserNote(!isTauriRuntime());
-  }, []);
 
   const mergeBytes = useCallback((incoming: SourceBytes) => {
     setSourceBytes((prev) => {
@@ -496,6 +490,13 @@ export default function App() {
     >
       <Toolbar
         workspace={session.workspace}
+        documentTitle={
+          session.pages.length === 0
+            ? "PDF Manager"
+            : basename(
+                [...session.sources.values()][0]?.path ?? "Untitled",
+              )
+        }
         canUndo={session.past.length > 0}
         canRedo={session.future.length > 0}
         canSave={session.pages.length > 0}
@@ -558,19 +559,21 @@ export default function App() {
         onDelete={onDelete}
         onWorkspace={(workspace) => { setTool("select"); dispatch({ type: "setWorkspace", workspace }); }}
       />
-      {(error || browserNote) && (
+      {error ? (
         <div className="banner" role="status">
-          {error ??
-            "Browser mode. Open/Insert/Combine use the file picker. Save as downloads a PDF."}
+          {error}
         </div>
-      )}
+      ) : null}
       <main className="workspace">
         {session.workspace === "view" ? (
           <div className="editor-layout">
+            {focusedPage ? (
             <MarkupToolbar tool={tool} style={markupStyle} disabled={busy || !focusedPage} selected={tool === "select" ? selectedObject : undefined}
               onTool={(next) => { setTool(next); if (next !== "select" && session.focused !== null) dispatch({ type: "select", indices: [], mode: "replace" }); }}
               onStyle={setMarkupStyle} onImage={() => void addImage()} onText={addText} onEdit={editObject} />
+            ) : null}
           <div className="view-layout">
+            {session.pages.length > 0 ? (
             <PageRail
               pages={session.pages}
               sources={session.sources}
@@ -582,11 +585,14 @@ export default function App() {
               onSelect={onSelect}
               onMove={(from, to) => dispatch({ type: "move", from, to })}
             />
+            ) : null}
             <PagePreview
               tool={tool}
               markupStyle={markupStyle}
               onPlace={placeObject}
               busy={busy}
+              onOpen={() => void runOpen("open")}
+              onCombine={() => void runOpen("combine")}
               page={focusedPage}
               bytes={focusedBytes}
               pageNumber={session.focused !== null ? session.focused + 1 : null}

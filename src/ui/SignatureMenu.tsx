@@ -58,13 +58,16 @@ export function SignatureMenu(props: SignatureMenuProps) {
     <div className="signature-menu" ref={rootRef}>
       <button
         type="button"
+        className="pill blue"
+        aria-expanded={open}
+        aria-haspopup="dialog"
         onClick={() => {
           setOpen((value) => !value);
           setDrawing(false);
         }}
         disabled={props.busy}
       >
-        Signature
+        Sign
       </button>
       {open ? (
         <div className="signature-menu-panel">
@@ -78,6 +81,7 @@ export function SignatureMenu(props: SignatureMenuProps) {
             />
           ) : (
             <>
+              <h3 className="signature-menu-heading">Signatures</h3>
               {props.vault.entries.length === 0 ? (
                 <p className="signature-menu-empty">No saved signatures.</p>
               ) : (
@@ -111,10 +115,10 @@ export function SignatureMenu(props: SignatureMenuProps) {
               )}
               <div className="signature-menu-actions">
                 <button type="button" onClick={() => setDrawing(true)}>
-                  Draw…
+                  Draw
                 </button>
                 <button type="button" onClick={() => void props.onImport()}>
-                  Import…
+                  Import
                 </button>
               </div>
             </>
