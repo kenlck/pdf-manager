@@ -52,12 +52,11 @@ export function MarkupToolbar(props: Props) {
   return <div className="markup-panel">
     <fieldset className="markup-toolbar" disabled={props.disabled} aria-label="Markup tools">
       <legend className="sr-only">Markup tools</legend>
-      <span className="markup-label">Markup</span>
       <div className="toolbar-group">
-        {tools.slice(0, 1).map(({ tool, label, path }) => <button key={tool} type="button" aria-pressed={props.tool === tool} onClick={() => props.onTool(tool)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={path} /></svg>{label}</button>)}
-        <button type="button" onClick={props.onImage}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v18H3ZM3 18l6-7 5 5 3-3 4 5M15 7h.01" /></svg>Image</button>
-        <button type="button" onClick={props.onText}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M8 20h8" /></svg>Text</button>
-        {tools.slice(1).map(({ tool, label, path }) => <button key={tool} type="button" aria-pressed={props.tool === tool} onClick={() => props.onTool(tool)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={path} /></svg>{label}</button>)}
+        {tools.slice(0, 1).map(({ tool, label, path }) => <button key={tool} type="button" className="tool" title={label} aria-pressed={props.tool === tool} onClick={() => props.onTool(tool)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={path} /></svg><span className="sr-only">{label}</span></button>)}
+        <button type="button" className="tool" title="Image" onClick={props.onImage}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v18H3ZM3 18l6-7 5 5 3-3 4 5M15 7h.01" /></svg><span className="sr-only">Image</span></button>
+        <button type="button" className="tool" title="Text" onClick={props.onText}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M8 20h8" /></svg><span className="sr-only">Text</span></button>
+        {tools.slice(1).map(({ tool, label, path }) => <button key={tool} type="button" className="tool" title={label} aria-pressed={props.tool === tool} onClick={() => props.onTool(tool)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={path} /></svg><span className="sr-only">{label}</span></button>)}
       </div>
       <div className="markup-properties">
         <label>Color<input aria-label="Markup color" type="color" value={color} onChange={(e) => changeStyle({ color: e.target.value })} /></label>
