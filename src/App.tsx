@@ -243,8 +243,6 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-    // Bootstrap once from the URL. Do not re-run when session changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const runSave = useCallback(async () => {
