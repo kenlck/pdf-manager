@@ -243,8 +243,6 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-    // Bootstrap once from the URL. Do not re-run when session changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const runSave = useCallback(async () => {
@@ -367,22 +365,23 @@ export default function App() {
 
   const focusedPage =
     session.focused !== null ? (session.pages[session.focused] ?? null) : null;
-  const focusedBytes = focusedPage
-    ? sourceBytes.get(focusedPage.sourceId)
-    : undefined;
   const pageIndices = selectedPageIndices(session.selection);
   const stampSel = selectedStamp(session.selection);
 
   const selectedObject = stampSel ? session.pages[stampSel.pageIndex]?.stamps.find((stamp) => stamp.id === stampSel.stampId) : undefined;
 
   function pageAspect() {
-    const bounds = document.querySelector(".page-preview .page-stack")?.getBoundingClientRect();
+    const focusedStack =
+      session.focused !== null
+        ? document.querySelector(`.page-preview [data-page-index="${session.focused}"] .page-stack`)
+        : null;
+    const bounds = (focusedStack ?? document.querySelector(".page-preview .page-stack"))?.getBoundingClientRect();
     return bounds && bounds.width > 0 && bounds.height > 0 ? bounds.width / bounds.height : 0.8;
   }
 
-  function placeObject(stamp: Stamp) {
-    if (session.focused === null || busy) return;
-    dispatch({ type: "placeStamp", pageIndex: session.focused, stamp });
+  function placeObject(pageIndex: number, stamp: Stamp) {
+    if (busy) return;
+    dispatch({ type: "placeStamp", pageIndex, stamp });
     setStatus(`${stamp.label ?? stamp.content?.kind ?? "Object"} added.`);
   }
 
@@ -392,7 +391,13 @@ export default function App() {
     const content = textContent("Text", markupStyle.fontSize, markupStyle.color);
     const w = Math.min(0.8, content.width / 800);
     const h = Math.min(0.8, content.height / 800 * pageAspect());
-    placeObject({ id: mintStampId(), content, rect: displayNormRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h }) });
+    placeObject(session.focused, { id: mintStampId(), content, rect: displayNormRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h }) });
+  }
+
+  function runPrint() {
+    if (session.pages.length === 0) return;
+    window.print();
+    setStatus("Print dialog opened.");
   }
 
   async function addImage() {
@@ -541,6 +546,8 @@ export default function App() {
         onOpen={() => void runOpen("open")}
         onInsert={() => void runOpen("insert")}
         onCombine={() => void runOpen("combine")}
+        onPrint={runPrint}
+        canPrint={session.pages.length > 0}
         onSave={() => void runSave()}
         onUndo={() => dispatch({ type: "undo" })}
         onRedo={() => dispatch({ type: "redo" })}
@@ -587,49 +594,41 @@ export default function App() {
             />
             ) : null}
             <PagePreview
+              pages={session.pages}
+              sourceBytes={sourceBytes}
+              focused={session.focused}
               tool={tool}
               markupStyle={markupStyle}
               onPlace={placeObject}
               busy={busy}
               onOpen={() => void runOpen("open")}
               onCombine={() => void runOpen("combine")}
-              page={focusedPage}
-              bytes={focusedBytes}
-              pageNumber={session.focused !== null ? session.focused + 1 : null}
-              total={session.pages.length}
               stampBytes={stampBytes}
               selectedStampId={stampSel?.stampId ?? null}
-              onSelectStamp={(stampId) => {
-                if (session.focused === null) {
-                  return;
-                }
+              selectedStampPage={stampSel?.pageIndex ?? null}
+              onSelectStamp={(pageIndex, stampId) => {
                 dispatch({
                   type: "selectStamp",
-                  pageIndex: session.focused,
+                  pageIndex,
                   stampId,
                 });
               }}
-              onCommitStamp={(stampId, rect) => {
-                if (session.focused === null) {
-                  return;
-                }
+              onCommitStamp={(pageIndex, stampId, rect) => {
                 dispatch({
                   type: "transformStamp",
-                  pageIndex: session.focused,
+                  pageIndex,
                   stampId,
                   rect,
                 });
               }}
-              onSelectPage={() => {
-                if (session.focused === null) {
-                  return;
-                }
+              onSelectPage={(pageIndex) => {
                 dispatch({
                   type: "select",
-                  indices: [session.focused],
+                  indices: [pageIndex],
                   mode: "replace",
                 });
               }}
+              onFocus={(index) => dispatch({ type: "focus", index })}
             />
           </div>
           </div>

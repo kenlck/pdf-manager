@@ -261,9 +261,33 @@ button:focus-visible {
 
 .page-preview-stage {
   overflow: auto;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
   padding: 1.25rem 1rem 3rem;
+}
+
+.page-preview [data-page-index] {
+  margin: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-preview [data-page-index].focused .page-stack canvas {
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.28), 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+.page-label {
+  margin: 0.45rem 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  font-style: normal;
+  color: var(--muted);
+  line-height: 1.2;
+  text-align: center;
 }
 
 .page-stack {
@@ -618,22 +642,6 @@ select:focus-visible,
   color: var(--accent-ink);
 }
 
-.page-badge {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  margin: 0;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-}
-
 .page-grid-scroller {
   height: 100%;
   overflow: auto;
@@ -716,6 +724,59 @@ select:focus-visible,
   background: var(--surface);
   color: var(--muted);
   font-size: 12px;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    height: auto;
+    overflow: visible;
+    background: white;
+  }
+
+  .toolbar,
+  .banner,
+  .markup-panel,
+  .page-rail,
+  .status-bar,
+  .page-label {
+    display: none !important;
+  }
+
+  .app,
+  .workspace,
+  .editor-layout,
+  .view-layout,
+  .page-preview,
+  .page-preview-stage {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: white;
+  }
+
+  .page-stack {
+    break-after: page;
+    box-shadow: none;
+    max-width: 100%;
+  }
+
+  .page-preview [data-page-index]:last-child .page-stack {
+    break-after: auto;
+  }
+
+  .page-stack canvas {
+    box-shadow: none;
+  }
+
+  .stamp-handle {
+    display: none;
+  }
+
+  .stamp.selected {
+    outline: none;
+  }
 }
 
 @media (max-width: 720px) {
