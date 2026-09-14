@@ -6,12 +6,14 @@ type ToolbarProps = {
   canUndo: boolean;
   canRedo: boolean;
   canSave: boolean;
+  canPrint: boolean;
   hasSelection: boolean;
   busy: boolean;
   signatureMenu: ReactNode;
   onOpen: () => void;
   onInsert: () => void;
   onCombine: () => void;
+  onPrint: () => void;
   onSave: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -114,6 +116,14 @@ export function Toolbar(props: ToolbarProps) {
             onClick={props.onDelete}
           />
         </div>
+        <button
+          type="button"
+          className="pill"
+          onClick={props.onPrint}
+          disabled={props.busy || !props.canPrint}
+        >
+          Print
+        </button>
         <button
           type="button"
           className="pill"

@@ -14,14 +14,15 @@ Local desktop app for viewing PDFs and composing pages into a new file.
 - Add text boxes and edit their text, size, and color
 - Draw with Pencil, Rectangle, Oval, and Line tools; choose stroke width, color, and shape fill
 - Undo/redo object edits, moves, resizing, and deletion
+- Print the current document
 
-In **View**, use the **Markup** bar to add objects. Drag on the page with a drawing
+In **View**, the right panel shows every page. Use the **Markup** bar to add objects. Drag on the page with a drawing
 tool, or choose **Image** / **Text** to insert an object. Switch to **Select** (or
 press Escape), then select an object to move it or resize it with a corner handle.
 Select a text box to edit its text in the markup bar; leaving the field applies the
 edit. Delete/Backspace removes the selected object. Original PDF text is not editable.
 
-**Save as** includes every overlay in the resulting PDF. Added text and drawings
+**Print** is next to **Save as** in the action bar. **Save as** includes every overlay in the resulting PDF. Added text and drawings
 are flattened to transparent images at export (up to 3× PDF point resolution,
 capped at 4096 pixels per side). They remain editable during the current session,
 but cannot be separately edited or searched as text after reopening the exported PDF.
