@@ -2,6 +2,7 @@ import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees, rgb } from "pdf-
 import { describe, expect, it, vi } from "vitest";
 import { displayedRectToPdfDrawImage, displayNormRect } from "../domain/stampGeometry";
 import { asSourceId, asStampId, type MarkupContent } from "../domain/types";
+import { assertNoLiveText, decodePageContents } from "./outline";
 import { openPdf, resetSourceCounter } from "./openPdf";
 import { writePdfFromPlan } from "./write";
 
@@ -144,6 +145,25 @@ describe("pdf open and write", () => {
     const xObject = resources?.lookup(PDFName.of("XObject"), PDFDict);
     expect(xObject).toBeDefined();
     expect(xObject?.keys().length).toBeGreaterThan(0);
+  });
+
+  it("outlines source text so the saved PDF has no fonts", async () => {
+    resetSourceCounter();
+    const sourceBytes = await makeDoc(["Hello"]);
+    const opened = await openPdf(sourceBytes, "/tmp/a.pdf");
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const outBytes = await writePdfFromPlan(
+      [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0, stamps: [] }],
+      new Map([[opened.source.id, opened.bytes]]),
+      new Map(),
+    );
+    const saved = await PDFDocument.load(outBytes);
+    const page = saved.getPages()[0];
+    assertNoLiveText(page);
+    const content = decodePageContents(page);
+    expect(content).toMatch(/(?:^|[\s])m(?:$|[\s])/);
+    expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).toEqual([]);
   });
 
   it("throws when stamp bytes are missing", async () => {
