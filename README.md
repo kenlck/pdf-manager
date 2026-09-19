@@ -26,7 +26,7 @@ edit. Delete/Backspace removes the selected object. Original PDF text is not edi
 
 **Save as** keeps original page text live and searchable, and it keeps the original fonts.
 
-**Outline & Save as** converts source page text to outlines so Adobe Illustrator can open the file without the original fonts. Standard 14 fonts and embedded TrueType faces outline this way. **Outline & Save as** reports an error for composite CID fonts, which this release does not outline. **Save as** still works for those files.
+**Outline & Save as** converts source page text to outlines so Adobe Illustrator can open the file without the original fonts. Standard 14 fonts, embedded TrueType and OpenType faces, and text inside form XObjects outline this way.
 
 Added text and drawings are flattened to transparent images at export (up to 3× PDF point resolution, capped at 4096 pixels per side). They remain editable during the current session, but cannot be separately edited or searched as text after reopening the exported PDF.
 

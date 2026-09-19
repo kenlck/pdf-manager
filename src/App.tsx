@@ -12,7 +12,6 @@ import {
 } from "./domain/types";
 import { isSupportedDocument, openDocument } from "./pdf/openDocument";
 import { clearRenderCache } from "./pdf/render";
-import { OutlineFailed } from "./pdf/outline";
 import { writePdfFromPlan, type ExportTextPolicy } from "./pdf/write";
 import {
   loadPdfsFromUrls,
@@ -275,11 +274,7 @@ export default function App() {
           : `Saved ${basename(path)}. Rearranging pages invalidates digital signatures.`,
       );
     } catch (err) {
-      if (textPolicy === "outlined" && err instanceof OutlineFailed) {
-        setError(`${err.message} Use Save as to keep the text live instead.`);
-      } else {
-        setError(err instanceof Error ? err.message : "Save failed.");
-      }
+      setError(err instanceof Error ? err.message : "Save failed.");
     } finally {
       setBusy(false);
     }

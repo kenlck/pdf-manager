@@ -18,14 +18,6 @@ vi.mock("./pdf/write", async (original) => ({
   ...await original<typeof import("./pdf/write")>(),
   writePdfFromPlan: vi.fn(async () => new Uint8Array([37, 80, 68, 70])),
 }));
-
-vi.mock("./shell/files", async (original) => ({
-  ...await original<typeof import("./shell/files")>(),
-  pickImage: vi.fn(),
-  pickOpenDocuments: vi.fn(),
-  pickSavePdf: vi.fn(),
-  writePdfBytes: vi.fn(),
-}));
 vi.mock("./pdf/render", () => ({ clearRenderCache: vi.fn() }));
 vi.mock("./ui/usePageCanvas", () => ({ usePageCanvas: () => ({ current: null }) }));
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

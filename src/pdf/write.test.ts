@@ -2,7 +2,7 @@ import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees, rgb } from "pdf-
 import { describe, expect, it, vi } from "vitest";
 import { displayedRectToPdfDrawImage, displayNormRect } from "../domain/stampGeometry";
 import { asSourceId, asStampId, type MarkupContent } from "../domain/types";
-import { OutlineFailed, assertNoLiveText, decodePageContents } from "./outline";
+import { findLiveText } from "./outline";
 import { openPdf, resetSourceCounter } from "./openPdf";
 import { writePdfFromPlan } from "./write";
 
@@ -205,14 +205,14 @@ describe("pdf open and write", () => {
       "outlined",
     );
     const saved = await PDFDocument.load(outBytes);
+    expect(findLiveText(saved)).toEqual({ showing: [], fontResources: [] });
     const page = saved.getPages()[0];
-    assertNoLiveText(page);
-    const content = decodePageContents(page);
-    expect(content).toMatch(/(?:^|[\s])m(?:$|[\s])/);
+    const xobjects = page.node.Resources()?.lookup(PDFName.of("XObject"), PDFDict);
+    expect(xobjects?.keys().length).toBeGreaterThan(0);
     expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).toEqual([]);
   });
 
-  it("keeps Font resources and Tj or TJ when text policy is live", async () => {
+  it("keeps Font resources and showing operators when text policy is live", async () => {
     resetSourceCounter();
     const opened = await openPdf(await makeDoc(["Hello"]), "/tmp/a.pdf");
     expect(opened.ok).toBe(true);
@@ -223,9 +223,9 @@ describe("pdf open and write", () => {
       new Map(),
       "live",
     );
-    const page = (await PDFDocument.load(outBytes)).getPages()[0];
-    expect(decodePageContents(page)).toMatch(/(?:^|[\s])(?:Tj|TJ)(?:$|[\s])/);
-    expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).not.toEqual([]);
+    const saved = await PDFDocument.load(outBytes);
+    expect(findLiveText(saved).showing).not.toEqual([]);
+    expect(findLiveText(saved).fontResources).not.toEqual([]);
   });
 
   it("leaves the input source bytes unchanged after an outlined write", async () => {
@@ -252,12 +252,12 @@ describe("pdf open and write", () => {
     const plan = [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0 as const, stamps: [] }];
     await writePdfFromPlan(plan, sourceBytes, new Map(), "outlined");
     const liveBytes = await writePdfFromPlan(plan, sourceBytes, new Map(), "live");
-    const page = (await PDFDocument.load(liveBytes)).getPages()[0];
-    expect(decodePageContents(page)).toMatch(/(?:^|[\s])(?:Tj|TJ)(?:$|[\s])/);
-    expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).not.toEqual([]);
+    const saved = await PDFDocument.load(liveBytes);
+    expect(findLiveText(saved).showing).not.toEqual([]);
+    expect(findLiveText(saved).fontResources).not.toEqual([]);
   });
 
-  it("live write accepts a Type0 page and outlined write rejects it", async () => {
+  it("live write keeps Type0 text and outlined write does not throw", async () => {
     resetSourceCounter();
     const bytes = await makeType0Page();
     const fonts = (await PDFDocument.load(bytes)).getPages()[0]
@@ -274,11 +274,13 @@ describe("pdf open and write", () => {
     const plan = [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0 as const, stamps: [] }];
     const sourceBytes = new Map([[opened.source.id, opened.bytes]]);
     const live = await writePdfFromPlan(plan, sourceBytes, new Map(), "live");
-    expect((await PDFDocument.load(live)).getPageCount()).toBe(1);
-    await expect(writePdfFromPlan(plan, sourceBytes, new Map(), "outlined")).rejects.toThrow(OutlineFailed);
-    await expect(writePdfFromPlan(plan, sourceBytes, new Map(), "outlined")).rejects.toThrow(
-      /composite font/,
-    );
+    const liveDoc = await PDFDocument.load(live);
+    expect(liveDoc.getPageCount()).toBe(1);
+    expect(findLiveText(liveDoc).showing).not.toEqual([]);
+    const outlined = await writePdfFromPlan(plan, sourceBytes, new Map(), "outlined");
+    const outlinedDoc = await PDFDocument.load(outlined);
+    expect(outlinedDoc.getPageCount()).toBe(1);
+    expect(findLiveText(outlinedDoc).fontResources).toEqual([]);
   });
 
   it("throws when stamp bytes are missing", async () => {

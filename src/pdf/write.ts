@@ -2,7 +2,7 @@ import { PDFDocument, degrees } from "pdf-lib";
 import { displayedRectToPdfDrawImage, rotatedArtworkDraw } from "../domain/stampGeometry";
 import type { ExportPage, Rotation, SourceId, StampBytes } from "../domain/types";
 import { rasterizeArtwork } from "../markup/artwork";
-import { outlineSourcePages } from "./outline";
+import { outlineAllText } from "./outline";
 
 export type ExportTextPolicy = "live" | "outlined";
 
@@ -34,27 +34,6 @@ export async function writePdfFromPlan(
     );
   }
 
-  switch (textPolicy) {
-    case "live":
-      break;
-    case "outlined": {
-      const pagesBySource = new Map<SourceId, number[]>();
-      for (const page of plan) {
-        const indices = pagesBySource.get(page.sourceId);
-        if (indices) indices.push(page.pageIndex);
-        else pagesBySource.set(page.sourceId, [page.pageIndex]);
-      }
-      for (const [sourceId, indices] of pagesBySource) {
-        await outlineSourcePages(loaded.get(sourceId)!, indices);
-      }
-      break;
-    }
-    default: {
-      const _never: never = textPolicy;
-      throw new Error(`Unknown text policy: ${_never}`);
-    }
-  }
-
   const out = await PDFDocument.create();
   for (const page of plan) {
     const sourceDoc = loaded.get(page.sourceId)!;
@@ -82,6 +61,18 @@ export async function writePdfFromPlan(
     }
     copied.setRotation(degrees(rotation));
     out.addPage(copied);
+  }
+
+  switch (textPolicy) {
+    case "live":
+      break;
+    case "outlined":
+      await outlineAllText(out);
+      break;
+    default: {
+      const _never: never = textPolicy;
+      throw new Error(`Unknown text policy: ${_never}`);
+    }
   }
 
   return out.save();
