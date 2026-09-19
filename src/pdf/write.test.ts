@@ -2,7 +2,7 @@ import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees, rgb } from "pdf-
 import { describe, expect, it, vi } from "vitest";
 import { displayedRectToPdfDrawImage, displayNormRect } from "../domain/stampGeometry";
 import { asSourceId, asStampId, type MarkupContent } from "../domain/types";
-import { assertNoLiveText, decodePageContents } from "./outline";
+import { findLiveText } from "./outline";
 import { openPdf, resetSourceCounter } from "./openPdf";
 import { writePdfFromPlan } from "./write";
 
@@ -159,10 +159,10 @@ describe("pdf open and write", () => {
       new Map(),
     );
     const saved = await PDFDocument.load(outBytes);
+    expect(findLiveText(saved)).toEqual({ showing: [], fontResources: [] });
     const page = saved.getPages()[0];
-    assertNoLiveText(page);
-    const content = decodePageContents(page);
-    expect(content).toMatch(/(?:^|[\s])m(?:$|[\s])/);
+    const xobjects = page.node.Resources()?.lookup(PDFName.of("XObject"), PDFDict);
+    expect(xobjects?.keys().length).toBeGreaterThan(0);
     expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).toEqual([]);
   });
 
