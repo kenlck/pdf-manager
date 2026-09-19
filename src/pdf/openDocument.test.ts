@@ -12,7 +12,7 @@ it("turns an image into one exportable page containing the image", async () => {
   expect(result.source.pageCount).toBe(1);
   const output = await writePdfFromPlan(
     [{ sourceId: result.source.id, pageIndex: 0, rotation: 0, stamps: [] }],
-    new Map([[result.source.id, result.bytes]]), new Map(),
+    new Map([[result.source.id, result.bytes]]), new Map(), "live",
   );
   const doc = await PDFDocument.load(output);
   expect(doc.getPageCount()).toBe(1);
