@@ -2,9 +2,51 @@ import { PDFDict, PDFDocument, PDFName, StandardFonts, degrees, rgb } from "pdf-
 import { describe, expect, it, vi } from "vitest";
 import { displayedRectToPdfDrawImage, displayNormRect } from "../domain/stampGeometry";
 import { asSourceId, asStampId, type MarkupContent } from "../domain/types";
-import { assertNoLiveText, decodePageContents } from "./outline";
+import { OutlineFailed, assertNoLiveText, decodePageContents } from "./outline";
 import { openPdf, resetSourceCounter } from "./openPdf";
 import { writePdfFromPlan } from "./write";
+
+async function makeType0Page(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 200]);
+  const ctx = doc.context;
+  const type0 = ctx.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "Dummy",
+    Encoding: "Identity-H",
+    DescendantFonts: [
+      ctx.obj({
+        Type: "Font",
+        Subtype: "CIDFontType2",
+        BaseFont: "Dummy",
+        CIDSystemInfo: ctx.obj({
+          Registry: "Adobe",
+          Ordering: "Identity",
+          Supplement: 0,
+        }),
+        FontDescriptor: ctx.obj({
+          Type: "FontDescriptor",
+          FontName: "Dummy",
+          Flags: 4,
+          FontBBox: [0, 0, 500, 700],
+          ItalicAngle: 0,
+          Ascent: 700,
+          Descent: 0,
+          CapHeight: 700,
+          StemV: 80,
+        }),
+        DW: 500,
+      }),
+    ],
+  });
+  page.node.Resources()!.set(PDFName.of("Font"), ctx.obj({ F1: ctx.register(type0) }));
+  page.node.set(
+    PDFName.of("Contents"),
+    ctx.register(ctx.flateStream("BT /F1 12 Tf 20 100 Td (Hi) Tj ET")),
+  );
+  return doc.save();
+}
 
 async function makeDoc(labels: string[]): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -36,7 +78,7 @@ describe("pdf open and write", () => {
     const output = await writePdfFromPlan([{ sourceId: id, pageIndex: 0, rotation: 90, stamps: [
       { stampId: asStampId("image"), rect },
       ...content.map((item, i) => ({ stampId: asStampId(`markup-${i}`), content: item, rect, rotation: 90 as const })),
-    ] }], new Map([[id, await doc.save()]]), new Map([[asStampId("image"), png]]), rasterize);
+    ] }], new Map([[id, await doc.save()]]), new Map([[asStampId("image"), png]]), "live", rasterize);
     const saved = await PDFDocument.load(output);
     expect(saved.getPages()[0].getRotation().angle).toBe(180);
     expect(saved.getPages()[0].getCropBox()).toEqual({ x: 20, y: 30, width: 400, height: 600 });
@@ -73,6 +115,7 @@ describe("pdf open and write", () => {
         [b.source.id, b.bytes],
       ]),
       new Map(),
+      "live",
     );
     const out = await PDFDocument.load(outBytes);
     expect(out.getPageCount()).toBe(2);
@@ -99,6 +142,7 @@ describe("pdf open and write", () => {
         [b.source.id, b.bytes],
       ]),
       new Map(),
+      "live",
     );
     const out = await PDFDocument.load(outBytes);
     expect(out.getPageCount()).toBe(4);
@@ -139,6 +183,7 @@ describe("pdf open and write", () => {
       ],
       new Map([[opened.source.id, opened.bytes]]),
       new Map([[stampId, png]]),
+      "live",
     );
     const out = await PDFDocument.load(outBytes);
     const resources = out.getPages()[0].node.Resources();
@@ -157,6 +202,7 @@ describe("pdf open and write", () => {
       [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0, stamps: [] }],
       new Map([[opened.source.id, opened.bytes]]),
       new Map(),
+      "outlined",
     );
     const saved = await PDFDocument.load(outBytes);
     const page = saved.getPages()[0];
@@ -164,6 +210,75 @@ describe("pdf open and write", () => {
     const content = decodePageContents(page);
     expect(content).toMatch(/(?:^|[\s])m(?:$|[\s])/);
     expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).toEqual([]);
+  });
+
+  it("keeps Font resources and Tj or TJ when text policy is live", async () => {
+    resetSourceCounter();
+    const opened = await openPdf(await makeDoc(["Hello"]), "/tmp/a.pdf");
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const outBytes = await writePdfFromPlan(
+      [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0, stamps: [] }],
+      new Map([[opened.source.id, opened.bytes]]),
+      new Map(),
+      "live",
+    );
+    const page = (await PDFDocument.load(outBytes)).getPages()[0];
+    expect(decodePageContents(page)).toMatch(/(?:^|[\s])(?:Tj|TJ)(?:$|[\s])/);
+    expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).not.toEqual([]);
+  });
+
+  it("leaves the input source bytes unchanged after an outlined write", async () => {
+    resetSourceCounter();
+    const opened = await openPdf(await makeDoc(["Hello"]), "/tmp/a.pdf");
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const snapshot = opened.bytes.slice();
+    await writePdfFromPlan(
+      [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0, stamps: [] }],
+      new Map([[opened.source.id, opened.bytes]]),
+      new Map(),
+      "outlined",
+    );
+    expect(opened.bytes).toEqual(snapshot);
+  });
+
+  it("still produces live text after an outlined write on the same sourceBytes map", async () => {
+    resetSourceCounter();
+    const opened = await openPdf(await makeDoc(["Hello"]), "/tmp/a.pdf");
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const sourceBytes = new Map([[opened.source.id, opened.bytes]]);
+    const plan = [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0 as const, stamps: [] }];
+    await writePdfFromPlan(plan, sourceBytes, new Map(), "outlined");
+    const liveBytes = await writePdfFromPlan(plan, sourceBytes, new Map(), "live");
+    const page = (await PDFDocument.load(liveBytes)).getPages()[0];
+    expect(decodePageContents(page)).toMatch(/(?:^|[\s])(?:Tj|TJ)(?:$|[\s])/);
+    expect(page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict)?.keys() ?? []).not.toEqual([]);
+  });
+
+  it("live write accepts a Type0 page and outlined write rejects it", async () => {
+    resetSourceCounter();
+    const bytes = await makeType0Page();
+    const fonts = (await PDFDocument.load(bytes)).getPages()[0]
+      .node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict);
+    const subtype = [...(fonts?.keys() ?? [])]
+      .map((key) => fonts!.lookup(key, PDFDict).lookup(PDFName.of("Subtype"))?.toString() ?? "")
+      .join(" ");
+    if (!/Type0|CIDFont/.test(subtype)) {
+      throw new Error(`makeType0Page did not produce a Type0 font (${subtype || "no Subtype"})`);
+    }
+    const opened = await openPdf(bytes, "/tmp/cid.pdf");
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const plan = [{ sourceId: opened.source.id, pageIndex: 0, rotation: 0 as const, stamps: [] }];
+    const sourceBytes = new Map([[opened.source.id, opened.bytes]]);
+    const live = await writePdfFromPlan(plan, sourceBytes, new Map(), "live");
+    expect((await PDFDocument.load(live)).getPageCount()).toBe(1);
+    await expect(writePdfFromPlan(plan, sourceBytes, new Map(), "outlined")).rejects.toThrow(OutlineFailed);
+    await expect(writePdfFromPlan(plan, sourceBytes, new Map(), "outlined")).rejects.toThrow(
+      /composite font/,
+    );
   });
 
   it("throws when stamp bytes are missing", async () => {
@@ -192,6 +307,7 @@ describe("pdf open and write", () => {
         ],
         new Map([[opened.source.id, opened.bytes]]),
         new Map(),
+        "live",
       ),
     ).rejects.toThrow(`Missing stamp bytes ${stampId}`);
   });

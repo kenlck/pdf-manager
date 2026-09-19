@@ -4,12 +4,15 @@ import type { ExportPage, Rotation, SourceId, StampBytes } from "../domain/types
 import { rasterizeArtwork } from "../markup/artwork";
 import { outlineSourcePages } from "./outline";
 
-export type SourceBytes = Map<SourceId, Uint8Array>;
+export type ExportTextPolicy = "live" | "outlined";
+
+export type SourceBytes = ReadonlyMap<SourceId, Uint8Array>;
 
 export async function writePdfFromPlan(
   plan: ExportPage[],
   sourceBytes: SourceBytes,
   stampBytes: StampBytes,
+  textPolicy: ExportTextPolicy,
   renderArtwork = rasterizeArtwork,
 ): Promise<Uint8Array> {
   if (plan.length === 0) {
@@ -31,14 +34,25 @@ export async function writePdfFromPlan(
     );
   }
 
-  const pagesBySource = new Map<SourceId, number[]>();
-  for (const page of plan) {
-    const indices = pagesBySource.get(page.sourceId);
-    if (indices) indices.push(page.pageIndex);
-    else pagesBySource.set(page.sourceId, [page.pageIndex]);
-  }
-  for (const [sourceId, indices] of pagesBySource) {
-    await outlineSourcePages(loaded.get(sourceId)!, indices);
+  switch (textPolicy) {
+    case "live":
+      break;
+    case "outlined": {
+      const pagesBySource = new Map<SourceId, number[]>();
+      for (const page of plan) {
+        const indices = pagesBySource.get(page.sourceId);
+        if (indices) indices.push(page.pageIndex);
+        else pagesBySource.set(page.sourceId, [page.pageIndex]);
+      }
+      for (const [sourceId, indices] of pagesBySource) {
+        await outlineSourcePages(loaded.get(sourceId)!, indices);
+      }
+      break;
+    }
+    default: {
+      const _never: never = textPolicy;
+      throw new Error(`Unknown text policy: ${_never}`);
+    }
   }
 
   const out = await PDFDocument.create();

@@ -33,6 +33,7 @@ describe("perf budgets", () => {
       plan.pages,
       new Map([[opened.source.id, opened.bytes]]),
       new Map(),
+      "live",
     );
     const elapsed = performance.now() - start;
     expect(out.byteLength).toBeGreaterThan(1000);
