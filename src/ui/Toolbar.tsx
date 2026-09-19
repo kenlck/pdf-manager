@@ -14,7 +14,8 @@ type ToolbarProps = {
   onInsert: () => void;
   onCombine: () => void;
   onPrint: () => void;
-  onSave: () => void;
+  onSaveLive: () => void;
+  onSaveOutlined: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onRotate: (delta: 90 | -90) => void;
@@ -127,10 +128,20 @@ export function Toolbar(props: ToolbarProps) {
         <button
           type="button"
           className="pill"
-          onClick={props.onSave}
+          title="Save a copy. Page text stays searchable and selectable."
+          onClick={props.onSaveLive}
           disabled={props.busy || !props.canSave}
         >
           Save as
+        </button>
+        <button
+          type="button"
+          className="pill"
+          title="Save a copy with page text converted to outlines for Illustrator. The copy is not searchable."
+          onClick={props.onSaveOutlined}
+          disabled={props.busy || !props.canSave}
+        >
+          Outline & Save as
         </button>
       </div>
     </header>

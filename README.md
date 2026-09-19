@@ -22,10 +22,13 @@ press Escape), then select an object to move it or resize it with a corner handl
 Select a text box to edit its text in the markup bar; leaving the field applies the
 edit. Delete/Backspace removes the selected object. Original PDF text is not editable.
 
-**Print** is next to **Save as** in the action bar. **Save as** includes every overlay in the resulting PDF. Original page text is converted to outlines, so Adobe Illustrator can open the file without the original fonts. Standard 14 fonts, embedded TrueType and OpenType faces, and text inside form XObjects outline this way. Added text and drawings
-are flattened to transparent images at export (up to 3× PDF point resolution,
-capped at 4096 pixels per side). They remain editable during the current session,
-but cannot be separately edited or searched as text after reopening the exported PDF.
+**Print** is next to **Save as** and **Outline & Save as** in the action bar. Both save actions include every overlay in the resulting PDF.
+
+**Save as** keeps original page text live and searchable, and it keeps the original fonts.
+
+**Outline & Save as** converts source page text to outlines so Adobe Illustrator can open the file without the original fonts. Standard 14 fonts, embedded TrueType and OpenType faces, and text inside form XObjects outline this way.
+
+Added text and drawings are flattened to transparent images at export (up to 3× PDF point resolution, capped at 4096 pixels per side). They remain editable during the current session, but cannot be separately edited or searched as text after reopening the exported PDF.
 
 Original files are never overwritten.
 

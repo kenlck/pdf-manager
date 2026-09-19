@@ -4,12 +4,15 @@ import type { ExportPage, Rotation, SourceId, StampBytes } from "../domain/types
 import { rasterizeArtwork } from "../markup/artwork";
 import { outlineAllText } from "./outline";
 
-export type SourceBytes = Map<SourceId, Uint8Array>;
+export type ExportTextPolicy = "live" | "outlined";
+
+export type SourceBytes = ReadonlyMap<SourceId, Uint8Array>;
 
 export async function writePdfFromPlan(
   plan: ExportPage[],
   sourceBytes: SourceBytes,
   stampBytes: StampBytes,
+  textPolicy: ExportTextPolicy,
   renderArtwork = rasterizeArtwork,
 ): Promise<Uint8Array> {
   if (plan.length === 0) {
@@ -60,6 +63,17 @@ export async function writePdfFromPlan(
     out.addPage(copied);
   }
 
-  await outlineAllText(out);
+  switch (textPolicy) {
+    case "live":
+      break;
+    case "outlined":
+      await outlineAllText(out);
+      break;
+    default: {
+      const _never: never = textPolicy;
+      throw new Error(`Unknown text policy: ${_never}`);
+    }
+  }
+
   return out.save();
 }

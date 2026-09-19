@@ -22,6 +22,7 @@ describe("outlineAllText", () => {
       [{ sourceId: id, pageIndex: 0, rotation: 0, stamps: [] }],
       new Map([[id, await source.save()]]),
       new Map(),
+      "outlined",
     );
     const saved = await PDFDocument.load(out);
     expect(findLiveText(saved)).toEqual({ showing: [], fontResources: [] });
@@ -59,6 +60,7 @@ describe("outlineAllText", () => {
       Array.from({ length: 20 }, (_, pageIndex) => ({ sourceId: id, pageIndex, rotation: 0 as const, stamps: [] })),
       new Map([[id, bytes]]),
       new Map(),
+      "outlined",
     );
     const elapsed = performance.now() - start;
     const saved = await PDFDocument.load(out);

@@ -12,7 +12,7 @@ import {
 } from "./domain/types";
 import { isSupportedDocument, openDocument } from "./pdf/openDocument";
 import { clearRenderCache } from "./pdf/render";
-import { writePdfFromPlan } from "./pdf/write";
+import { writePdfFromPlan, type ExportTextPolicy } from "./pdf/write";
 import {
   loadPdfsFromUrls,
   pickImage,
@@ -245,7 +245,7 @@ export default function App() {
     };
   }, []);
 
-  const runSave = useCallback(async () => {
+  const runSave = useCallback(async (textPolicy: ExportTextPolicy) => {
     setError(null);
     const plan = buildExportPlan(session);
     if (!plan.ok) {
@@ -254,15 +254,24 @@ export default function App() {
     }
     setBusy(true);
     try {
-      const path = await pickSavePdf("composed.pdf");
+      const path = await pickSavePdf(
+        textPolicy === "outlined" ? "composed-outlined.pdf" : "composed.pdf",
+      );
       if (!path) {
         setStatus("Save cancelled.");
         return;
       }
-      const bytes = await writePdfFromPlan(plan.pages, sourceBytes, stampBytes);
+      const bytes = await writePdfFromPlan(
+        plan.pages,
+        sourceBytes,
+        stampBytes,
+        textPolicy,
+      );
       await writePdfBytes(path, bytes);
       setStatus(
-        `Saved ${basename(path)}. Rearranging pages invalidates digital signatures.`,
+        textPolicy === "outlined"
+          ? `Saved ${basename(path)}. Page text is now outlines and is no longer searchable.`
+          : `Saved ${basename(path)}. Rearranging pages invalidates digital signatures.`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed.");
@@ -548,7 +557,8 @@ export default function App() {
         onCombine={() => void runOpen("combine")}
         onPrint={runPrint}
         canPrint={session.pages.length > 0}
-        onSave={() => void runSave()}
+        onSaveLive={() => void runSave("live")}
+        onSaveOutlined={() => void runSave("outlined")}
         onUndo={() => dispatch({ type: "undo" })}
         onRedo={() => dispatch({ type: "redo" })}
         onRotate={(delta) =>
