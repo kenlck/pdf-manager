@@ -2,7 +2,7 @@ import { PDFDocument, degrees } from "pdf-lib";
 import { displayedRectToPdfDrawImage, rotatedArtworkDraw } from "../domain/stampGeometry";
 import type { ExportPage, Rotation, SourceId, StampBytes } from "../domain/types";
 import { rasterizeArtwork } from "../markup/artwork";
-import { outlineSourcePages } from "./outline";
+import { outlineAllText } from "./outline";
 
 export type SourceBytes = Map<SourceId, Uint8Array>;
 
@@ -29,16 +29,6 @@ export async function writePdfFromPlan(
       page.sourceId,
       await PDFDocument.load(bytes, { updateMetadata: false }),
     );
-  }
-
-  const pagesBySource = new Map<SourceId, number[]>();
-  for (const page of plan) {
-    const indices = pagesBySource.get(page.sourceId);
-    if (indices) indices.push(page.pageIndex);
-    else pagesBySource.set(page.sourceId, [page.pageIndex]);
-  }
-  for (const [sourceId, indices] of pagesBySource) {
-    await outlineSourcePages(loaded.get(sourceId)!, indices);
   }
 
   const out = await PDFDocument.create();
@@ -70,5 +60,6 @@ export async function writePdfFromPlan(
     out.addPage(copied);
   }
 
+  await outlineAllText(out);
   return out.save();
 }
